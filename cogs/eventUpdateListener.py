@@ -8,8 +8,9 @@ from discord.ext import commands
 class EventView(discord.ui.View):
     joiningUser = 0
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, bot, timeout=None):
+        super().__init__(timeout=timeout)
+        self.bot = bot
 
     @discord.ui.button(label="Join this event",
                        style=discord.ButtonStyle.success)
@@ -23,9 +24,13 @@ class EventView(discord.ui.View):
                     jd[str(interaction.message.id)]["joining"].append(interaction.user.id)
                     with open("data/joiningUser.json", "w") as f:
                         json.dump(jd, f, indent=2)
-                    await interaction.response.send_message(f"{interaction.user.mention} Joined !\nCurrent participants: {self.joiningUser}")
-                else:
-                    await interaction.response.send_message(f"{interaction.user.mention} You have already joined this event.\nCurrent participants: {self.joiningUser}")
+                    oldEmbed = interaction.message.embeds[0]
+                    oldEmbed.description = ""
+                    for i, user_id in enumerate(jd[str(interaction.message.id)]["joining"]):
+                        user = self.bot.get_user(user_id)
+                        if user is not None:
+                            oldEmbed.description += f"{i+1}: {user.mention}\n"
+                    await interaction.message.edit(embed=oldEmbed)
         except Exception as e:
             print(e)
 
@@ -41,9 +46,13 @@ class EventView(discord.ui.View):
                     jd[str(interaction.message.id)]["joining"].remove(interaction.user.id)
                     with open("data/joiningUser.json", "w") as f:
                         json.dump(jd, f, indent=2)
-                    await interaction.response.send_message(f"{interaction.user.mention} Declined.\nCurrent participants: {self.joiningUser}")
-                else:
-                    await interaction.response.send_message(f"{interaction.user.mention} You have not yet joined this event.\nCurrent participants: {self.joiningUser}")
+                    oldEmbed = interaction.message.embeds[0]
+                    oldEmbed.description = ""
+                    for i, user_id in enumerate(jd[str(interaction.message.id)]["joining"]):
+                        user = self.bot.get_user(user_id)
+                        if user is not None:
+                            oldEmbed.description += f"{i+1}: {user.mention}\n"
+                    await interaction.message.edit(embed=oldEmbed)
         except Exception as e:
             print(e)
 
@@ -54,9 +63,15 @@ class Event(commands.Cog):
     @commands.Cog.listener()
     async def on_scheduled_event_create(self, e):
         try:
-            notifyView = EventView()
+            notifyEmbed = discord.Embed(
+                title="参加者",
+                description="",
+                timestamp=e.start_time,
+                color=discord.Colour.green()
+            )
+            notifyView = EventView(self.bot, timeout=None)
             notifyChan = self.bot.get_partial_messageable(settings.NOTIFY_CHAN)
-            embed = await notifyChan.send(e.url, view=notifyView)
+            embed = await notifyChan.send(e.url, embed=notifyEmbed, view=notifyView)
 
             # register event
             with open("data/joiningUser.json") as f:
