@@ -56,7 +56,7 @@ class Event(commands.Cog):
         try:
             notifyView = EventView()
             notifyChan = self.bot.get_partial_messageable(settings.NOTIFY_CHAN)
-            await notifyChan.send(e.url, view=notifyView)
+            embed = await notifyChan.send(e.url, view=notifyView)
 
             # register event
             with open("data/joiningUser.json") as f:
