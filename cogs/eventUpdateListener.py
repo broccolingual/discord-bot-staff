@@ -6,10 +6,10 @@ import discord
 from discord.ext import commands
 
 class EventForm(discord.ui.Modal):
-    about = discord.ui.TextInput(label="内容", placeholder="~というゲームをみんなでしませんか?...", style=discord.TextStyle.long)
+    about = discord.ui.TextInput(label="内容", placeholder="少し遅れます...", style=discord.TextStyle.long)
 
     def __init__(self, bot, timeout=86400, origInteraction=None): # timeout - 24h
-        super().__init__(title="イベントへの提案", timeout=timeout)
+        super().__init__(title="コメント", timeout=timeout)
         self.bot = bot
         self.origInteraction = origInteraction
 
@@ -85,7 +85,7 @@ class EventView(discord.ui.View):
         except Exception as e:
             print(e)
 
-    @discord.ui.button(label="イベントへの提案",
+    @discord.ui.button(label="コメント",
                        style=discord.ButtonStyle.gray)
     async def about_event(self, interaction: discord.Interaction, button: discord.ui.Button):
         try:
@@ -110,7 +110,7 @@ class Event(commands.Cog):
                 description="",
                 color=discord.Colour.blue()
             )
-            eventEmbed.set_author(name="イベントへの提案")
+            eventEmbed.set_author(name="コメント")
             notifyView = EventView(self.bot, timeout=86400) # timeout - 24h
             notifyChan = self.bot.get_partial_messageable(settings.NOTIFY_CHAN)
             embed = await notifyChan.send(e.url, embeds=[notifyEmbed, eventEmbed], view=notifyView)
@@ -139,7 +139,7 @@ class Event(commands.Cog):
                     description="",
                     color=discord.Colour.blue()
                 )
-                eventEmbed.set_author(name="イベントへの提案")
+                eventEmbed.set_author(name="コメント")
                 notifyView = EventView(self.bot, timeout=86400) # timeout - 24h
                 notifyChan = self.bot.get_partial_messageable(settings.NOTIFY_CHAN)
                 embed = await notifyChan.send("Test", embeds=[notifyEmbed, eventEmbed], view=notifyView)
