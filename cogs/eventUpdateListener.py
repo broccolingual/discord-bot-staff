@@ -17,7 +17,7 @@ class EventForm(discord.ui.Modal):
         oldEmbed = self.origInteraction.message.embeds[1]
         if oldEmbed.description is None:
             oldEmbed.description = ""
-        oldEmbed.description += f"From {interaction.user.mention} **{self.about}**\n"
+        oldEmbed.description += f"\nFrom {interaction.user.mention} **{self.about}**"
         await self.origInteraction.message.edit(embeds=[self.origInteraction.message.embeds[0], oldEmbed])
         # 「インタラクションに失敗しました」対策
         await interaction.response.send_message("")
@@ -55,33 +55,6 @@ class EventView(discord.ui.View):
                         user = self.bot.get_user(user_id)
                         if user is not None:
                             oldEmbed.description += f"{i+1}: {user.mention}\n"
-                    await interaction.message.edit(embeds=[oldEmbed, interaction.message.embeds[1]])
-            # 「インタラクションに失敗しました」対策
-            await interaction.response.send_message("")
-        except Exception as e:
-            print(e)
-
-    @discord.ui.button(label="参加する(遅れます)",
-                       style=discord.ButtonStyle.primary)
-    async def join_not_on_time(self, interaction: discord.Interaction, button: discord.ui.Button):
-        try:
-            with open("data/joiningUser.json") as f:
-                    jd = json.load(f)
-            if str(interaction.message.id) in jd:
-                if interaction.user.id not in jd[str(interaction.message.id)]["joining"]:
-                    self.joiningUser += 1
-                    jd[str(interaction.message.id)]["joining"].append(interaction.user.id)
-                    with open("data/joiningUser.json", "w") as f:
-                        json.dump(jd, f, indent=2)
-                    oldEmbed = interaction.message.embeds[0]
-                    oldEmbed.description = ""
-                    for i, user_id in enumerate(jd[str(interaction.message.id)]["joining"]):
-                        user = self.bot.get_user(user_id)
-                        if user is not None:
-                            if user == interaction.user:
-                                oldEmbed.description += f"{i+1}: {user.mention} (遅れます)\n"
-                            else:
-                                oldEmbed.description += f"{i+1}: {user.mention}\n"
                     await interaction.message.edit(embeds=[oldEmbed, interaction.message.embeds[1]])
             # 「インタラクションに失敗しました」対策
             await interaction.response.send_message("")
