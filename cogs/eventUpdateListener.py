@@ -14,11 +14,13 @@ class EventForm(discord.ui.Modal):
         self.origInteraction = origInteraction
 
     async def on_submit(self, interaction: discord.Interaction):
-        oldEmbed = self.origInteraction.message.embeds[1]
-        if oldEmbed.description is None:
-            oldEmbed.description = ""
-        oldEmbed.description += f"\nFrom {interaction.user.mention} **{self.about}**"
-        await self.origInteraction.message.edit(embeds=[self.origInteraction.message.embeds[0], oldEmbed])
+        oldEmbed = self.origInteraction.message.embeds[0]
+        if oldEmbed.fields[1] is None:
+            oldEmbed.set_field_at(1, "Comments", "")
+        oldValue = oldEmbed.fields[1].value
+        oldValue += f"\nFrom {interaction.user.mention} : **{self.about}**"
+        oldEmbed.set_field_at(1, name=oldEmbed.fields[1].name, value=oldValue)
+        await self.origInteraction.message.edit(embeds=[oldEmbed])
         # 「インタラクションに失敗しました」対策
         await interaction.response.send_message("")
 
@@ -49,13 +51,14 @@ class EventView(discord.ui.View):
                     jd[str(interaction.message.id)]["joining"].append(interaction.user.id)
                     with open("data/joiningUser.json", "w") as f:
                         json.dump(jd, f, indent=2)
-                    oldEmbed = interaction.message.embeds[0]
-                    oldEmbed.description = ""
+                    oldEmbed = interaction.message.embeds[0] # get old embed
+                    newValue = ""
                     for i, user_id in enumerate(jd[str(interaction.message.id)]["joining"]):
                         user = self.bot.get_user(user_id)
                         if user is not None:
-                            oldEmbed.description += f"{i+1}: {user.mention}\n"
-                    await interaction.message.edit(embeds=[oldEmbed, interaction.message.embeds[1]])
+                            newValue += f"{i+1}: {user.mention}\n"
+                    oldEmbed.set_field_at(0, name=oldEmbed.fields[0].name, value=newValue)
+                    await interaction.message.edit(embeds=[oldEmbed])
             # 「インタラクションに失敗しました」対策
             await interaction.response.send_message("")
         except Exception as e:
@@ -73,13 +76,14 @@ class EventView(discord.ui.View):
                     jd[str(interaction.message.id)]["joining"].remove(interaction.user.id)
                     with open("data/joiningUser.json", "w") as f:
                         json.dump(jd, f, indent=2)
-                    oldEmbed = interaction.message.embeds[0]
-                    oldEmbed.description = ""
+                    oldEmbed = interaction.message.embeds[0] # get old embed
+                    newValue = ""
                     for i, user_id in enumerate(jd[str(interaction.message.id)]["joining"]):
                         user = self.bot.get_user(user_id)
                         if user is not None:
-                            oldEmbed.description += f"{i+1}: {user.mention}\n"
-                    await interaction.message.edit(embeds=[oldEmbed, interaction.message.embeds[1]])
+                            newValue += f"{i+1}: {user.mention}\n"
+                    oldEmbed.set_field_at(0, name=oldEmbed.fields[0].name, value=newValue)
+                    await interaction.message.edit(embeds=[oldEmbed])
             # 「インタラクションに失敗しました」対策
             await interaction.response.send_message("")
         except Exception as e:
@@ -103,55 +107,25 @@ class Event(commands.Cog):
             # create & send embed
             notifyEmbed = discord.Embed(
                 description="",
-                color=discord.Colour.green()
+                color=discord.Colour.random()
             )
-            notifyEmbed.set_author(name="参加希望者リスト")
-            eventEmbed = discord.Embed(
-                description="",
-                color=discord.Colour.blue()
-            )
-            eventEmbed.set_author(name="コメント")
+            notifyEmbed.add_field(name="👥 Applicants", value=f"1: {e.creator.mention}")
+            notifyEmbed.add_field(name="💬 Comments", value="")
+            notifyEmbed.set_footer(text=f"Event was created by {e.creator.display_name}", icon_url=e.creator.avatar.url)
+            notifyEmbed.timestamp = datetime.datetime.now()
             notifyView = EventView(self.bot, timeout=86400) # timeout - 24h
             notifyChan = self.bot.get_partial_messageable(settings.NOTIFY_CHAN)
-            embed = await notifyChan.send(e.url, embeds=[notifyEmbed, eventEmbed], view=notifyView)
+            embed = await notifyChan.send(e.url, embeds=[notifyEmbed], view=notifyView)
 
             # register event by message id
             with open("data/joiningUser.json") as f:
                 jd = json.load(f)
             jd[embed.id] = {"joining": []}
+            jd[embed.id]["joining"].append(e.creator_id)
             with open("data/joiningUser.json", "w") as f:
                 json.dump(jd, f, indent=2)
         except Exception as e:
             print(e)
-
-
-    @commands.group()
-    async def event(self, ctx):
-        if ctx.invoked_subcommand is None:
-            try:
-                # create & send embed
-                notifyEmbed = discord.Embed(
-                    description="",
-                    color=discord.Colour.green()
-                )
-                notifyEmbed.set_author(name="参加希望者リスト")
-                eventEmbed = discord.Embed(
-                    description="",
-                    color=discord.Colour.blue()
-                )
-                eventEmbed.set_author(name="コメント")
-                notifyView = EventView(self.bot, timeout=86400) # timeout - 24h
-                notifyChan = self.bot.get_partial_messageable(settings.NOTIFY_CHAN)
-                embed = await notifyChan.send("Test", embeds=[notifyEmbed, eventEmbed], view=notifyView)
-
-                # register event by message id
-                with open("data/joiningUser.json") as f:
-                    jd = json.load(f)
-                jd[embed.id] = {"joining": []}
-                with open("data/joiningUser.json", "w") as f:
-                    json.dump(jd, f, indent=2)
-            except Exception as e:
-                print(e)
 
 async def setup(bot):
     await bot.add_cog(Event(bot))

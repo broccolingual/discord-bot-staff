@@ -9,3 +9,4 @@ load_dotenv(dotenv_path)
 
 TOKEN = os.environ.get('TOKEN')
 NOTIFY_CHAN = os.environ.get('NOTIFY_CHAN')
+DSN = os.environ.get('DSN')
