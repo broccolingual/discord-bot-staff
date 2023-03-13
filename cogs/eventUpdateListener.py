@@ -44,7 +44,7 @@ class EventView(discord.ui.View):
     async def join(self, interaction: discord.Interaction, button: discord.ui.Button):
         try:
             with open("data/joiningUser.json") as f:
-                    jd = json.load(f)
+                jd = json.load(f)
             if str(interaction.message.id) in jd:
                 if interaction.user.id not in jd[str(interaction.message.id)]["joining"]:
                     self.joiningUser += 1
@@ -69,7 +69,7 @@ class EventView(discord.ui.View):
     async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
         try:
             with open("data/joiningUser.json") as f:
-                    jd = json.load(f)
+                jd = json.load(f)
             if str(interaction.message.id) in jd:
                 if interaction.user.id in jd[str(interaction.message.id)]["joining"]:
                     self.joiningUser -= 1
@@ -91,9 +91,25 @@ class EventView(discord.ui.View):
 
     @discord.ui.button(label="コメント",
                        style=discord.ButtonStyle.gray)
-    async def about_event(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def comment(self, interaction: discord.Interaction, button: discord.ui.Button):
         try:
             await interaction.response.send_modal(EventForm(self.bot, timeout=86400, origInteraction=interaction))
+        except Exception as e:
+            print(e)
+
+    @discord.ui.button(label="イベントを開始する",
+                       style=discord.ButtonStyle.primary)
+    async def start(self, interaction: discord.Interaction, button: discord.ui.Button):
+        try:
+            with open("data/joiningUser.json") as f:
+                jd = json.load(f)
+            ev = None
+            if str(interaction.message.id) in jd:
+                ev = interaction.guild.get_scheduled_event(jd[str(interaction.message.id)]["event_id"])
+            if ev is not None:
+                ev.start()
+            # 「インタラクションに失敗しました」対策
+            await interaction.response.send_message("")
         except Exception as e:
             print(e)
 
@@ -120,7 +136,7 @@ class Event(commands.Cog):
             # register event by message id
             with open("data/joiningUser.json") as f:
                 jd = json.load(f)
-            jd[embed.id] = {"joining": []}
+            jd[embed.id] = {"event_id": e.id, "joining": []}
             jd[embed.id]["joining"].append(e.creator_id)
             with open("data/joiningUser.json", "w") as f:
                 json.dump(jd, f, indent=2)

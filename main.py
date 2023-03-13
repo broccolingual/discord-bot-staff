@@ -26,13 +26,18 @@ async def on_connect():
 
 @bot.event
 async def on_disconnect():
-    logger.info('Bot disconnected.')
+    logger.warning('Bot disconnected.')
 
 
 @bot.event
 async def on_ready():
     await bot.change_presence(activity=discord.Game(f"^help"))
-    logger.info(f'Bot is ready, Logged in as {bot.user.name}.')
+    logger.info(f'Bot ready, Logged in as {bot.user.name}.')
+
+
+@bot.event
+async def on_resumed():
+    logger.info(f'Bot session resumed.')
 
 
 # @bot.event
