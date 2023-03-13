@@ -16,7 +16,7 @@ class EventForm(discord.ui.Modal):
     async def on_submit(self, interaction: discord.Interaction):
         oldEmbed = self.origInteraction.message.embeds[0]
         if oldEmbed.fields[1] is None:
-            oldEmbed.set_field_at(1, "Comments", "")
+            oldEmbed.set_field_at(1, "💬 Comments", "")
         oldValue = oldEmbed.fields[1].value
         oldValue += f"\nFrom {interaction.user.mention} : **{self.about}**"
         oldEmbed.set_field_at(1, name=oldEmbed.fields[1].name, value=oldValue)
