@@ -5,6 +5,8 @@ import settings
 import discord
 from discord.ext import commands
 
+from db import *
+
 class EventForm(discord.ui.Modal):
     about = discord.ui.TextInput(label="内容", placeholder="少し遅れます...", style=discord.TextStyle.long)
 
@@ -43,22 +45,20 @@ class EventView(discord.ui.View):
                        style=discord.ButtonStyle.success)
     async def join(self, interaction: discord.Interaction, button: discord.ui.Button):
         try:
-            with open("data/joiningUser.json") as f:
-                jd = json.load(f)
-            if str(interaction.message.id) in jd:
-                if interaction.user.id not in jd[str(interaction.message.id)]["joining"]:
-                    self.joiningUser += 1
-                    jd[str(interaction.message.id)]["joining"].append(interaction.user.id)
-                    with open("data/joiningUser.json", "w") as f:
-                        json.dump(jd, f, indent=2)
-                    oldEmbed = interaction.message.embeds[0] # get old embed
-                    newValue = ""
-                    for i, user_id in enumerate(jd[str(interaction.message.id)]["joining"]):
-                        user = self.bot.get_user(user_id)
-                        if user is not None:
-                            newValue += f"{i+1}: {user.mention}\n"
-                    oldEmbed.set_field_at(0, name=oldEmbed.fields[0].name, value=newValue)
-                    await interaction.message.edit(embeds=[oldEmbed])
+            # database
+            eventId = getEventID(interaction.message.id)
+            if eventId is not None:
+                insertJoinedUser(eventId, interaction.user.id)
+            joiningUserIDs = getJoinedUsers(eventId)
+            oldEmbed = interaction.message.embeds[0] # get old embed
+            newValue = ""
+            for i, userId in enumerate(joiningUserIDs):
+                user = self.bot.get_user(userId)
+                if user is not None:
+                    newValue += f"{i+1}: {user.mention}\n"
+            oldEmbed.set_field_at(0, name=oldEmbed.fields[0].name, value=newValue)
+            await interaction.message.edit(embeds=[oldEmbed])
+
             # 「インタラクションに失敗しました」対策
             await interaction.response.send_message("")
         except Exception as e:
@@ -68,22 +68,20 @@ class EventView(discord.ui.View):
                        style=discord.ButtonStyle.red)
     async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
         try:
-            with open("data/joiningUser.json") as f:
-                jd = json.load(f)
-            if str(interaction.message.id) in jd:
-                if interaction.user.id in jd[str(interaction.message.id)]["joining"]:
-                    self.joiningUser -= 1
-                    jd[str(interaction.message.id)]["joining"].remove(interaction.user.id)
-                    with open("data/joiningUser.json", "w") as f:
-                        json.dump(jd, f, indent=2)
-                    oldEmbed = interaction.message.embeds[0] # get old embed
-                    newValue = ""
-                    for i, user_id in enumerate(jd[str(interaction.message.id)]["joining"]):
-                        user = self.bot.get_user(user_id)
-                        if user is not None:
-                            newValue += f"{i+1}: {user.mention}\n"
-                    oldEmbed.set_field_at(0, name=oldEmbed.fields[0].name, value=newValue)
-                    await interaction.message.edit(embeds=[oldEmbed])
+            # database
+            eventId = getEventID(interaction.message.id)
+            if eventId is not None:
+                deleteJoinedUser(eventId, interaction.user.id)
+            joiningUserIDs = getJoinedUsers(eventId)
+            oldEmbed = interaction.message.embeds[0] # get old embed
+            newValue = ""
+            for i, userId in enumerate(joiningUserIDs):
+                user = self.bot.get_user(userId)
+                if user is not None:
+                    newValue += f"{i+1}: {user.mention}\n"
+            oldEmbed.set_field_at(0, name=oldEmbed.fields[0].name, value=newValue)
+            await interaction.message.edit(embeds=[oldEmbed])
+
             # 「インタラクションに失敗しました」対策
             await interaction.response.send_message("")
         except Exception as e:
@@ -94,22 +92,6 @@ class EventView(discord.ui.View):
     async def comment(self, interaction: discord.Interaction, button: discord.ui.Button):
         try:
             await interaction.response.send_modal(EventForm(self.bot, timeout=86400, origInteraction=interaction))
-        except Exception as e:
-            print(e)
-
-    @discord.ui.button(label="イベントを開始する",
-                       style=discord.ButtonStyle.primary)
-    async def start(self, interaction: discord.Interaction, button: discord.ui.Button):
-        try:
-            with open("data/joiningUser.json") as f:
-                jd = json.load(f)
-            ev = None
-            if str(interaction.message.id) in jd:
-                ev = interaction.guild.get_scheduled_event(jd[str(interaction.message.id)]["event_id"])
-            if ev is not None:
-                ev.start()
-            # 「インタラクションに失敗しました」対策
-            await interaction.response.send_message("")
         except Exception as e:
             print(e)
 
@@ -133,13 +115,10 @@ class Event(commands.Cog):
             notifyChan = self.bot.get_partial_messageable(settings.NOTIFY_CHAN)
             embed = await notifyChan.send(e.url, embeds=[notifyEmbed], view=notifyView)
 
-            # register event by message id
-            with open("data/joiningUser.json") as f:
-                jd = json.load(f)
-            jd[embed.id] = {"event_id": e.id, "joining": []}
-            jd[embed.id]["joining"].append(e.creator_id)
-            with open("data/joiningUser.json", "w") as f:
-                json.dump(jd, f, indent=2)
+            # database
+            createTables()
+            insertEvent(embed.id, e.id, e.creator_id)
+            insertJoinedUser(e.id, e.creator_id)
         except Exception as e:
             print(e)
 
