@@ -8,6 +8,7 @@ python-dotenv = "*"
 asyncpg = "*"
 "discord.py" = {version = "==2.2.2", extras = ["voice"]}
 psycopg2 = "*"
+requests = "*"
 
 [dev-packages]
 

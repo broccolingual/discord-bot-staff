@@ -1,5 +1,4 @@
 import datetime
-import json
 import settings
 
 import discord
@@ -27,8 +26,6 @@ class EventForm(discord.ui.Modal):
         await interaction.response.send_message("")
 
 class EventView(discord.ui.View):
-    joiningUser = 0
-
     def __init__(self, bot, timeout=86400): # timeout - 24h
         super().__init__(timeout=timeout)
         self.bot = bot
