@@ -98,9 +98,9 @@ class Tarkov(commands.Cog):
 
     @tarkov.command()
     async def price(self, ctx, *keywords):
-        if type(ctx.channel) is not discord.channel.DMChannel:
-            await ctx.reply(f"{ctx.author.mention}このコマンドはDMで実行してください。")
-            return
+        # if type(ctx.channel) is not discord.channel.DMChannel:
+        #     await ctx.reply(f"{ctx.author.mention}このコマンドはDMで実行してください。")
+        #     return
         keyword = " ".join(keywords)
         if keyword == "":
             await ctx.author.send(f"{ctx.author.mention}価格を調べるアイテムのキーワードが必要です。")
