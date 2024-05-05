@@ -4,14 +4,14 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-python-dotenv = "*"
-asyncpg = "*"
-"discord.py" = {version = "==2.2.2", extras = ["voice"]}
-psycopg2 = "*"
-requests = "*"
+sqlalchemy = "*"
+aiomysql = "*"
+"discord.py" = "*"
+cryptography = "*"
 
 [dev-packages]
+alembic = "*"
 
 [requires]
-python_version = "3.9"
-python_full_version = "3.9.2"
+python_version = "3.12"
+python_full_version = "3.12.3"
