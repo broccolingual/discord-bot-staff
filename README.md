@@ -8,7 +8,7 @@
 
 データベース作成
 
-`pipenv run alembic revision --autogenerate -m "create initial table"`
+`pipenv run alembic revision --autogenerate -m "commit message"`
 
 マイグレーション実行
 
