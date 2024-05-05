@@ -4,7 +4,6 @@ import settings
 import discord
 from discord.ext import commands
 
-# from db import *
 from db.interfaces import DB
 
 class EventForm(discord.ui.Modal):
