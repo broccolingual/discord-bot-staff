@@ -5,9 +5,9 @@ name = "pypi"
 
 [packages]
 sqlalchemy = "*"
-aiomysql = "*"
 "discord.py" = "*"
 cryptography = "*"
+requests = "*"
 
 [dev-packages]
 alembic = "*"
