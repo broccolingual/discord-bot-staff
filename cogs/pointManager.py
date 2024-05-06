@@ -14,6 +14,7 @@ class PointManager(commands.Cog):
           await ctx.reply(f"{ctx.author.mention}Subcommand is required.", embed=getSubcommandsEmbed(ctx.command))
           
   @point.command(
+    name="earned",
     description="Check the points a user has earned on the server",
   )
   async def earned(self, ctx, user: discord.User = None):
@@ -23,15 +24,17 @@ class PointManager(commands.Cog):
       await ctx.reply(f"{user.mention}'s points on `{ctx.guild.name}` are **{point}**.")
       
   @point.command(
+    name="ranking",
     description="Ranking of the points earned by users on the server",
   )
   async def ranking(self, ctx):
       userPoints = await self.getUserPointsOnServer(ctx.guild.id, limit=10)
+      print(userPoints)
       if userPoints is None:
           await ctx.reply("No user has earned points on this server.")
           return
-      embed = discord.Embed(title="Community Point Ranking",
-                            description=f":tada: Top 10 users on `{ctx.guild.name}` :tada:",
+      embed = discord.Embed(title=":medal: Community Point Ranking",
+                            description=f"Top 10 users on `{ctx.guild.name}`",
                             color=discord.Colour.yellow())
       rankingContents = ""
       for i, userPoint in enumerate(userPoints):
@@ -39,7 +42,11 @@ class PointManager(commands.Cog):
           point = userPoint[1]
           user = await self.bot.fetch_user(user_id)
           if i == 0:
-            rankingContents += f"`{i+1}.` **{point}** points - {user.mention} :tada: :tada: :tada:\n"
+            rankingContents += f":first_place: **{point}** points - {user.mention} :tada:\n"
+          elif i == 1:
+            rankingContents += f":second_place: **{point}** points - {user.mention}\n"
+          elif i == 2:
+            rankingContents += f":third_place: **{point}** points - {user.mention}\n"
           elif i == 9:
               break
           else:
@@ -48,6 +55,7 @@ class PointManager(commands.Cog):
       await ctx.reply(embed=embed)
   
   @point.command(
+    name="rules",
     description="Check the rules for earning points",
   )
   async def rules(self, ctx):
@@ -108,9 +116,9 @@ class PointManager(commands.Cog):
     return point.point
   
   @staticmethod
-  async def getUserPointsOnServer(server_id):
+  async def getUserPointsOnServer(server_id, limit=10):
     db = DB()
-    userPoints = db.getUserPointsOnServer(server_id)
+    userPoints = db.getUserPointsOnServer(server_id, limit=limit)
     if userPoints is None:
       return None
     return [[userPoint.user_id, userPoint.point] for userPoint in userPoints]

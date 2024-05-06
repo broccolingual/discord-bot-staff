@@ -18,10 +18,11 @@ handler.setFormatter(logging.Formatter('%(asctime)s:%(name)s:%(lineno)d:%(leveln
 logger.addHandler(handler)
 
 bot = commands.Bot(
-    command_prefix="/",
+    command_prefix="^",
     intents=discord.Intents.all(),
     help_command=MyHelpCommand(),
-    case_insensitive=True
+    case_insensitive=True,
+    activity=discord.Game(name="^help"),
 )
 
 @bot.event
@@ -36,7 +37,6 @@ async def on_disconnect():
 
 @bot.event
 async def on_ready():
-    await bot.change_presence(activity=discord.Game(f"/help"))
     logger.info(f'Bot ready, Logged in as {bot.user.name}.')
 
 
