@@ -26,25 +26,24 @@ class PointManager(commands.Cog):
     description="Ranking of the points earned by users on the server",
   )
   async def ranking(self, ctx):
-      userPoints = await self.getUserPointsOnServer(ctx.guild.id)
+      userPoints = await self.getUserPointsOnServer(ctx.guild.id, limit=10)
       if userPoints is None:
           await ctx.reply("No user has earned points on this server.")
           return
-      userPoints = sorted(userPoints, key=lambda x: list(x.values())[0], reverse=True)
-      embed = discord.Embed(title="Ranking of the points earned by users on the server",
-                            description=f"Top 10 users on `{ctx.guild.name}`",
+      embed = discord.Embed(title="Community Point Ranking",
+                            description=f":tada: Top 10 users on `{ctx.guild.name}` :tada:",
                             color=discord.Colour.yellow())
       rankingContents = ""
       for i, userPoint in enumerate(userPoints):
-          user_id = list(userPoint.keys())[0]
-          point = list(userPoint.values())[0]
+          user_id = userPoint[0]
+          point = userPoint[1]
           user = await self.bot.fetch_user(user_id)
           if i == 0:
-            rankingContents += f"`{i+1}.` {user.mention} - **{point}** points  :tada: :tada: :tada: \n"
+            rankingContents += f"`{i+1}.` **{point}** points - {user.mention} :tada: :tada: :tada:\n"
           elif i == 9:
               break
           else:
-              rankingContents += f"`{i+1}.` {user.mention} - {point} points\n"
+              rankingContents += f"`{i+1}.` **{point}** points - {user.mention}\n"
       embed.add_field(name="Ranking", value=rankingContents, inline=False)
       await ctx.reply(embed=embed)
   
@@ -114,7 +113,7 @@ class PointManager(commands.Cog):
     userPoints = db.getUserPointsOnServer(server_id)
     if userPoints is None:
       return None
-    return [{userPoint.user_id: userPoint.point} for userPoint in userPoints]
+    return [[userPoint.user_id, userPoint.point] for userPoint in userPoints]
 
 async def setup(bot):
   await bot.add_cog(PointManager(bot))

@@ -72,6 +72,6 @@ class DB():
         result = self.session.query(PointEarned).filter(PointEarned.server_id == server_id).filter(PointEarned.user_id == user_id).first()
         return result
     
-    def getUserPointsOnServer(self, server_id):
-        result = self.session.query(PointEarned).filter(PointEarned.server_id == server_id).all()
+    def getUserPointsOnServer(self, server_id, limit=10):
+        result = self.session.query(PointEarned).filter(PointEarned.server_id == server_id).order_by(PointEarned.point.desc()).limit(limit)
         return result
