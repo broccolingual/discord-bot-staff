@@ -6,6 +6,7 @@ from pathlib import Path
 import discord
 from discord.ext import commands, tasks
 
+from helpCommand import MyHelpCommand
 import settings
 
 logger = logging.getLogger(__name__)
@@ -16,8 +17,12 @@ handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter('%(asctime)s:%(name)s:%(lineno)d:%(levelname)s:%(message)s'))
 logger.addHandler(handler)
 
-bot = commands.Bot(command_prefix="^", intents=discord.Intents.all())
-# bot.remove_command('help')
+bot = commands.Bot(
+    command_prefix="^",
+    intents=discord.Intents.all(),
+    help_command=MyHelpCommand(),
+    case_insensitive=True
+)
 
 @bot.event
 async def on_connect():
@@ -62,6 +67,10 @@ async def on_resumed():
 
 #     if isinstance(error, commands.MissingPermissions):
 #         return
+
+@bot.command()
+async def ping(ctx):
+    await ctx.reply(f"Pong! ({round(bot.latency * 1000)}ms)")
 
 async def load_extensions():
     for filename in os.listdir("./cogs"):

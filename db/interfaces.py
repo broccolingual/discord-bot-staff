@@ -2,6 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from models.event import EventNotifyChannel, EventNotify, EventJoinedUser
+from models.point import PointEarned
 import settings
     
 class DB():
@@ -50,4 +51,27 @@ class DB():
     
     def getJoinedUsers(self, event_id):
         result = self.session.query(EventJoinedUser.user_id).filter(EventJoinedUser.event_id == event_id).all()
+        return result
+    
+    def initPoint(self, server_id, user_id):
+        self.session.add(PointEarned(server_id=server_id, user_id=user_id, point=0))
+        self.session.commit()
+        return self
+    
+    def updatePoint(self, server_id, user_id, point):
+        self.session.query(PointEarned).filter(PointEarned.server_id == server_id).filter(PointEarned.user_id == user_id).update({PointEarned.point: PointEarned.point + point})
+        self.session.commit()
+        return self
+    
+    def removePoint(self, server_id, user_id, point):
+        self.session.query(PointEarned).filter(PointEarned.server_id == server_id).filter(PointEarned.user_id == user_id).update({PointEarned.point: PointEarned.point - point})
+        self.session.commit()
+        return self
+    
+    def getPoint(self, server_id, user_id):
+        result = self.session.query(PointEarned).filter(PointEarned.server_id == server_id).filter(PointEarned.user_id == user_id).first()
+        return result
+    
+    def getUserPointsOnServer(self, server_id):
+        result = self.session.query(PointEarned).filter(PointEarned.server_id == server_id).all()
         return result

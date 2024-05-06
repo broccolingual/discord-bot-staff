@@ -4,6 +4,8 @@ import discord
 from discord.ext import commands
 import requests
 
+from utils.template import getSubcommandsEmbed
+
 class TarkovPriceView(discord.ui.View):
     def __init__(self, bot, result, timeout=300): # timeout - 5m
         super().__init__(timeout=timeout)
@@ -37,8 +39,7 @@ class TarkovPriceView(discord.ui.View):
         else:
             oldEmbed.set_field_at(1, name="Change last 48h", value=f"**{'{:,}'.format(currentItem['changeLast48h'])}** Roubles :arrow_heading_up:")
         await interaction.message.edit(embeds=[oldEmbed])
-        # 「インタラクションに失敗しました」対策
-        await interaction.response.send_message("")
+        await interaction.response.send_message("") # 「インタラクションに失敗しました」対策
 
     @discord.ui.button(label="→",
                        style=discord.ButtonStyle.success)
@@ -58,8 +59,7 @@ class TarkovPriceView(discord.ui.View):
             else:
                 oldEmbed.set_field_at(1, name="Change last 48h", value=f"**{'{:,}'.format(currentItem['changeLast48h'])}** Roubles :arrow_heading_up:")
             await interaction.message.edit(embeds=[oldEmbed])
-            # 「インタラクションに失敗しました」対策
-            await interaction.response.send_message("")
+            await interaction.response.send_message("") # 「インタラクションに失敗しました」対策
         except Exception as e:
             print(e)
 
@@ -91,27 +91,31 @@ class Tarkov(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.group()
+    @commands.group(
+        description="Commands related to Escape from Tarkov",
+    )
     async def tarkov(self, ctx):
         if ctx.invoked_subcommand is None:
-            await ctx.reply(f"{ctx.author.mention}サブコマンドが必要です。")
+            await ctx.reply(f"{ctx.author.mention}Subcommand is required.", embed=getSubcommandsEmbed(ctx.command))
 
-    @tarkov.command()
+    @tarkov.command(
+        description="Search the price of the item",
+    )
     async def price(self, ctx, *keywords):
         # if type(ctx.channel) is not discord.channel.DMChannel:
-        #     await ctx.reply(f"{ctx.author.mention}このコマンドはDMで実行してください。")
+        #     await ctx.reply(f"{ctx.author.mention}This command should be executed by DM.")
         #     return
         keyword = " ".join(keywords)
         if keyword == "":
-            await ctx.author.send(f"{ctx.author.mention}価格を調べるアイテムのキーワードが必要です。")
+            await ctx.author.send(f"{ctx.author.mention}Need keywords for items to check prices.")
             return
         resp = getPriceFromKeyword(keyword)
         if resp is None:
-            await ctx.author.send(f"{ctx.author.mention}エラーが発生しました。少し時間を置いてお試しください。")
+            await ctx.author.send(f"{ctx.author.mention}An error has occurred. Please try again in a few minutes.")
             return
         searchItems = resp["data"]["items"]
         if len(searchItems) == 0:
-            await ctx.author.send(f"{ctx.author.mention}アイテムが見つかりませんでした。")
+            await ctx.author.send(f"{ctx.author.mention}Item not found.")
             return
         
         priceView = TarkovPriceView(self.bot, searchItems)
