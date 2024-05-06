@@ -22,8 +22,7 @@ class EventForm(discord.ui.Modal):
         oldValue += f"\nFrom {interaction.user.mention} : **{self.about}**"
         oldEmbed.set_field_at(1, name=oldEmbed.fields[1].name, value=oldValue)
         await self.origInteraction.message.edit(embeds=[oldEmbed])
-        # 「インタラクションに失敗しました」対策
-        await interaction.response.send_message("")
+        await interaction.response.send_message("") # 「インタラクションに失敗しました」対策
 
 class EventView(discord.ui.View):
     def __init__(self, bot, timeout=86400): # timeout - 24h
@@ -37,7 +36,7 @@ class EventView(discord.ui.View):
 
     async def on_timeout(self):
         await self.disable_all_items()
-
+    
     @discord.ui.button(label="Join",
                        style=discord.ButtonStyle.success)
     async def join(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -56,9 +55,7 @@ class EventView(discord.ui.View):
                     newValue += f"`{i+1}.` {user.mention}\n"
             oldEmbed.set_field_at(0, name=oldEmbed.fields[0].name, value=newValue)
             await interaction.message.edit(embeds=[oldEmbed])
-
-            # 「インタラクションに失敗しました」対策
-            await interaction.response.send_message("")
+            await interaction.response.send_message("") # 「インタラクションに失敗しました」対策
         except Exception as e:
             print(e)
 
@@ -80,9 +77,7 @@ class EventView(discord.ui.View):
                     newValue += f"{i+1}: {user.mention}\n"
             oldEmbed.set_field_at(0, name=oldEmbed.fields[0].name, value=newValue)
             await interaction.message.edit(embeds=[oldEmbed])
-
-            # 「インタラクションに失敗しました」対策
-            await interaction.response.send_message("")
+            await interaction.response.send_message("") # 「インタラクションに失敗しました」対策
         except Exception as e:
             print(e)
 
@@ -102,10 +97,7 @@ class EventNotify(commands.Cog):
     async def on_scheduled_event_create(self, e):
         try:
             # create & send embed
-            notifyEmbed = discord.Embed(
-                description="Event details",
-                color=discord.Colour.random()
-            )
+            notifyEmbed = discord.Embed(description="Event details", color=discord.Colour.random())
             notifyEmbed.add_field(name="👥 Applicants", value=f"1: {e.creator.mention}")
             notifyEmbed.add_field(name="💬 Comments", value="")
             notifyEmbed.set_footer(text=f"Event was created by {e.creator.display_name}", icon_url=e.creator.avatar.url)
