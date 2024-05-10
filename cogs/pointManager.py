@@ -29,7 +29,7 @@ class PointManager(commands.Cog):
   )
   async def ranking(self, ctx):
       userPoints = await self.getUserPointsOnServer(ctx.guild.id, limit=10)
-      print(userPoints)
+      # print(userPoints)
       if userPoints is None:
           await ctx.reply("No user has earned points on this server.")
           return
@@ -97,7 +97,7 @@ class PointManager(commands.Cog):
     if db.getPoint(server_id, user_id) is None:
       db.initPoint(server_id, user_id)
     db.updatePoint(server_id, user_id, point)
-    print(f"Added {point} points to {server_id} on {user_id}")
+    # print(f"Added {point} points to {server_id} on {user_id}")
   
   @staticmethod
   async def removePoint(server_id, user_id: int, point: int):
@@ -105,7 +105,7 @@ class PointManager(commands.Cog):
     if db.getPoint(server_id, user_id) is None:
       db.initPoint(server_id, user_id)
     db.removePoint(server_id, user_id, point)
-    print(f"Removed {point} points to {server_id} on {user_id}")
+    # print(f"Removed {point} points to {server_id} on {user_id}")
   
   @staticmethod
   async def getPoint(server_id, user_id: int):

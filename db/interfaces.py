@@ -50,7 +50,7 @@ class DB():
         return self
     
     def getJoinedUsers(self, event_id):
-        result = self.session.query(EventJoinedUser.user_id).filter(EventJoinedUser.event_id == event_id).all()
+        result = self.session.query(EventJoinedUser.user_id).filter(EventJoinedUser.event_id == event_id).order_by(EventJoinedUser.created_at).all()
         return result
     
     def initPoint(self, server_id, user_id):
