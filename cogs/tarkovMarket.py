@@ -1,6 +1,7 @@
 import datetime
 
 import discord
+from discord import app_commands
 from discord.ext import commands
 import requests
 
@@ -87,35 +88,25 @@ query {{
         return None
     return resp.json()
 
-class Tarkov(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
-
-    @commands.group(
-        description="Commands related to Escape from Tarkov",
-    )
-    async def tarkov(self, ctx):
-        if ctx.invoked_subcommand is None:
-            await ctx.reply(f"{ctx.author.mention}Subcommand is required.", embed=getSubcommandsEmbed(ctx.command))
-
-    @tarkov.command(
+class Tarkov(app_commands.Group):
+    @app_commands.command(
+        name="price",
         description="Search the price of the item",
     )
-    async def price(self, ctx, *keywords):
-        # if type(ctx.channel) is not discord.channel.DMChannel:
-        #     await ctx.reply(f"{ctx.author.mention}This command should be executed by DM.")
-        #     return
-        keyword = " ".join(keywords)
+    async def price(self, interaction: discord.Interaction, keyword: str):
+        if type(interaction.channel) is not discord.channel.DMChannel:
+            await interaction.response.send_message(f"{interaction.author.mention}This command should be executed by DM.")
+            return
         if keyword == "":
-            await ctx.author.send(f"{ctx.author.mention}Need keywords for items to check prices.")
+            await interaction.response.send_message(f"{interaction.author.mention}Need keywords for items to check prices.")
             return
         resp = getPriceFromKeyword(keyword)
         if resp is None:
-            await ctx.author.send(f"{ctx.author.mention}An error has occurred. Please try again in a few minutes.")
+            await interaction.response.send_message(f"{interaction.author.mention}An error has occurred. Please try again in a few minutes.")
             return
         searchItems = resp["data"]["items"]
         if len(searchItems) == 0:
-            await ctx.author.send(f"{ctx.author.mention}Item not found.")
+            await interaction.response.send_message(f"{interaction.author.mention}Item not found.")
             return
         
         priceView = TarkovPriceView(self.bot, searchItems)
@@ -130,7 +121,7 @@ class Tarkov(commands.Cog):
             embed.add_field(name="Change last 48h", value=f"**{'{:,}'.format(searchItems[0]['changeLast48h'])}** Roubles :arrow_heading_down:")
         else:
             embed.add_field(name="Change last 48h", value=f"**{'{:,}'.format(searchItems[0]['changeLast48h'])}** Roubles :arrow_heading_up:")
-        await ctx.author.send(embeds=[embed], view=priceView)
+        await interaction.response.send_message(embeds=[embed], view=priceView)
 
 async def setup(bot):
-    await bot.add_cog(Tarkov(bot))
+    bot.tree.add_command(Tarkov(name="tarkov", description="Commands related to Escape from Tarkov."))

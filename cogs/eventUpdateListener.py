@@ -1,9 +1,9 @@
 import datetime
 
 import discord
+from discord import app_commands
 from discord.ext import commands
 
-from utils.template import getSubcommandsEmbed
 from db.interfaces import DB
 from cogs.pointManager import PointManager
 
@@ -163,27 +163,18 @@ class EventNotifyChannelResistrationView(discord.ui.View):
             await interaction.response.edit_message(content="Notify channel is not updated by some reason.", view=None)
             print(e)
             
-class EventNotifyChannelResister(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
-    
-    @commands.group(
-        description="Notify channel registration",
-    )
-    async def notify(self, ctx):
-        if ctx.invoked_subcommand is None:
-            await ctx.reply(f"{ctx.author.mention}Subcommand is required.", embed=getSubcommandsEmbed(ctx.command))
-            
-    @notify.command(
+class EventNotifyChannelResister(app_commands.Group):            
+    @app_commands.command(
+        name="resister",
         description="Register the channel to notify (only for administrators)",
     )
-    @commands.has_permissions(administrator=True)
-    async def register(self, ctx):
+    @app_commands.checks.has_permissions(administrator=True)
+    async def register(self, interaction: discord.Interaction):
         try:
-            await ctx.reply("Please click the button to register the channel.", view=EventNotifyChannelResistrationView(self.bot))
+            await interaction.response.send_message("Please click the button to register the channel.", view=EventNotifyChannelResistrationView(self.bot))
         except Exception as e:
             print(e)
 
 async def setup(bot):
     await bot.add_cog(EventNotify(bot))
-    await bot.add_cog(EventNotifyChannelResister(bot))
+    bot.tree.add_command(EventNotifyChannelResister(name="notify", description="Notify channel registration"))

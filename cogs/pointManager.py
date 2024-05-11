@@ -1,40 +1,33 @@
 import discord
+from discord import app_commands
 from discord.ext import commands
 
 from utils.template import getSubcommandsEmbed
 from db.interfaces import DB
 
-class PointManager(commands.Cog):
-  def __init__ (self, bot):
-    self.bot = bot
-    
-  @commands.group()
-  async def point(self, ctx):
-      if ctx.invoked_subcommand is None:
-          await ctx.reply(f"{ctx.author.mention}Subcommand is required.", embed=getSubcommandsEmbed(ctx.command))
-          
-  @point.command(
+class Point(app_commands.Group):
+  @app_commands.command(
     name="earned",
     description="Check the points a user has earned on the server",
   )
-  async def earned(self, ctx, user: discord.User = None):
+  async def earned(self, interaction: discord.Interaction, user: discord.User = None):
       if user is None:
-          user = ctx.author
-      point = await self.getPoint(ctx.guild.id, user.id)
-      await ctx.reply(f"{user.mention}'s points on `{ctx.guild.name}` are **{point}**.")
+          user = interaction.author
+      point = await PointManager.getPoint(interaction.guild.id, user.id)
+      await interaction.response.send_message(f"{user.mention}'s points on `{interaction.guild.name}` are **{point}**.")
       
-  @point.command(
+  @app_commands.command(
     name="ranking",
     description="Ranking of the points earned by users on the server",
   )
-  async def ranking(self, ctx):
-      userPoints = await self.getUserPointsOnServer(ctx.guild.id, limit=10)
+  async def ranking(self, interaction: discord.Interaction):
+      userPoints = await PointManager.getUserPointsOnServer(interaction.guild.id, limit=10)
       # print(userPoints)
       if userPoints is None:
-          await ctx.reply("No user has earned points on this server.")
+          await interaction.response.send_message("No user has earned points on this server.")
           return
       embed = discord.Embed(title=":medal: Community Point Ranking",
-                            description=f"Top 10 users on `{ctx.guild.name}`",
+                            description=f"Top 10 users on `{interaction.guild.name}`",
                             color=discord.Colour.yellow())
       rankingContents = ""
       for i, userPoint in enumerate(userPoints):
@@ -52,45 +45,51 @@ class PointManager(commands.Cog):
           else:
               rankingContents += f"`{i+1}.` **{point}** points - {user.mention}\n"
       embed.add_field(name="Ranking", value=rankingContents, inline=False)
-      await ctx.reply(embed=embed)
+      await interaction.response.send_message(embed=embed)
   
-  @point.command(
+  @app_commands.command(
     name="rules",
     description="Check the rules for earning points",
   )
-  async def rules(self, ctx):
-      await ctx.reply("You can earn points by sending messages, creating invites, reacting to messages, creating threads, and joining voice channels.")
+  async def rules(self, interaction: discord.Interaction):
+      await interaction.response.send_message("You can earn points by sending messages, creating invites, reacting to messages, creating threads, and joining voice channels.")
+  
+
+class PointListener(commands.Cog):
+  def __init__ (self, bot):
+    self.bot = bot
   
   @commands.Cog.listener()
   async def on_message(self, message):
     if message.author.bot:
       return
-    await self.addPoint(message.guild.id, message.author.id, 2)
+    await PointManager.addPoint(message.guild.id, message.author.id, 2)
   
   @commands.Cog.listener()
   async def on_invite_create(self, invite):
     if invite.inviter.bot:
       return
-    await self.addPoint(invite.guild.id, invite.inviter.id, 5)
+    await PointManager.addPoint(invite.guild.id, invite.inviter.id, 5)
     
   @commands.Cog.listener()
   async def on_raw_reaction_add(self, reaction, user):
     if user.bot:
       return
-    await self.addPoint(reaction.message.guild.id, user.id, 1)
+    await PointManager.addPoint(reaction.message.guild.id, user.id, 1)
   
   @commands.Cog.listener()
   async def on_thread_create(self, thread):
     if thread.owner.bot:
       return
-    await self.addPoint(thread.guild.id, thread.owner.id, 5)
+    await PointManager.addPoint(thread.guild.id, thread.owner.id, 5)
   
   @commands.Cog.listener()
   async def on_voice_state_update(self, member, before, after):
     if member.bot or after.channel is not None:
       return
-    await self.addPoint(member.guild.id, member.id, 5)
-  
+    await PointManager.addPoint(member.guild.id, member.id, 5)
+
+class PointManager():
   @staticmethod
   async def addPoint(server_id, user_id: int, point: int):
     db = DB()
@@ -124,4 +123,5 @@ class PointManager(commands.Cog):
     return [[userPoint.user_id, userPoint.point] for userPoint in userPoints]
 
 async def setup(bot):
-  await bot.add_cog(PointManager(bot))
+  await bot.add_cog(PointListener(bot))
+  bot.tree.add_command(Point(name="point", description="Commands related to community points."))
