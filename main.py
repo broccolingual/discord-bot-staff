@@ -31,7 +31,7 @@ class StaffBot(commands.Bot):
         for filename in os.listdir("./cogs"):
             if filename.endswith(".py") and not filename.startswith("_"):
                 await self.load_extension(f"cogs.{filename[:-3]}")
-        synced_commands = await self.tree.sync(guild=None) # sync slash commands
+        synced_commands = await self.tree.sync()
         logger.info(f"Synced {len(synced_commands)} commands")
 
     async def on_ready(self):
@@ -71,8 +71,8 @@ class StaffBot(commands.Bot):
 bot = StaffBot()
 
 @bot.tree.command(name="ping")
-async def ping(ctx: discord.Interaction):
-    await ctx.reply(f"Pong! ({round(bot.latency * 1000)}ms)")
+async def ping(interaction: discord.Interaction):
+    await interaction.response.send_message(f"Pong! ({round(bot.latency * 1000)}ms)")
 
 if __name__ == "__main__":
     try:

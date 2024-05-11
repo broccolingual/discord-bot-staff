@@ -8,5 +8,5 @@ dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
 
 TOKEN = os.environ.get('TOKEN')
-NOTIFY_CHAN = os.environ.get('NOTIFY_CHAN')
 DSN = os.environ.get('DSN')
+GUILD_ID = os.environ.get('GUILD_ID')

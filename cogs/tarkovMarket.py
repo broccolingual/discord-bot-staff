@@ -5,12 +5,9 @@ from discord import app_commands
 from discord.ext import commands
 import requests
 
-from utils.template import getSubcommandsEmbed
-
 class TarkovPriceView(discord.ui.View):
-    def __init__(self, bot, result, timeout=300): # timeout - 5m
+    def __init__(self, result, timeout=300): # timeout - 5m
         super().__init__(timeout=timeout)
-        self.bot = bot
         self.result = result
         self.resultIndex = 0
         self.resultMax = len(result)
@@ -39,8 +36,7 @@ class TarkovPriceView(discord.ui.View):
             oldEmbed.set_field_at(1, name="Change last 48h", value=f"**{'{:,}'.format(currentItem['changeLast48h'])}** Roubles :arrow_heading_down:")
         else:
             oldEmbed.set_field_at(1, name="Change last 48h", value=f"**{'{:,}'.format(currentItem['changeLast48h'])}** Roubles :arrow_heading_up:")
-        await interaction.message.edit(embeds=[oldEmbed])
-        await interaction.response.send_message("") # 「インタラクションに失敗しました」対策
+        await interaction.response.edit_message(embeds=[oldEmbed])
 
     @discord.ui.button(label="→",
                        style=discord.ButtonStyle.success)
@@ -59,8 +55,7 @@ class TarkovPriceView(discord.ui.View):
                 oldEmbed.set_field_at(1, name="Change last 48h", value=f"**{'{:,}'.format(currentItem['changeLast48h'])}** Roubles :arrow_heading_down:")
             else:
                 oldEmbed.set_field_at(1, name="Change last 48h", value=f"**{'{:,}'.format(currentItem['changeLast48h'])}** Roubles :arrow_heading_up:")
-            await interaction.message.edit(embeds=[oldEmbed])
-            await interaction.response.send_message("") # 「インタラクションに失敗しました」対策
+            await interaction.response.edit_message(embeds=[oldEmbed])
         except Exception as e:
             print(e)
 
@@ -95,21 +90,21 @@ class Tarkov(app_commands.Group):
     )
     async def price(self, interaction: discord.Interaction, keyword: str):
         if type(interaction.channel) is not discord.channel.DMChannel:
-            await interaction.response.send_message(f"{interaction.author.mention}This command should be executed by DM.")
+            await interaction.response.send_message(f"{interaction.user.mention}This command should be executed by DM.")
             return
         if keyword == "":
-            await interaction.response.send_message(f"{interaction.author.mention}Need keywords for items to check prices.")
+            await interaction.response.send_message(f"{interaction.user.mention}Need keywords for items to check prices.")
             return
         resp = getPriceFromKeyword(keyword)
         if resp is None:
-            await interaction.response.send_message(f"{interaction.author.mention}An error has occurred. Please try again in a few minutes.")
+            await interaction.response.send_message(f"{interaction.user.mention}An error has occurred. Please try again in a few minutes.")
             return
         searchItems = resp["data"]["items"]
         if len(searchItems) == 0:
-            await interaction.response.send_message(f"{interaction.author.mention}Item not found.")
+            await interaction.response.send_message(f"{interaction.user.mention}Item not found.")
             return
         
-        priceView = TarkovPriceView(self.bot, searchItems)
+        priceView = TarkovPriceView(searchItems)
         embed = discord.Embed(title=f"Search Result ({len(searchItems)} search results)",
                             description=f"[1/{len(searchItems)}] {searchItems[0]['name']}",
                             color=discord.Colour.random())

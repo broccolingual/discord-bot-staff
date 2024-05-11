@@ -12,7 +12,7 @@ class Point(app_commands.Group):
   )
   async def earned(self, interaction: discord.Interaction, user: discord.User = None):
       if user is None:
-          user = interaction.author
+          user = interaction.user
       point = await PointManager.getPoint(interaction.guild.id, user.id)
       await interaction.response.send_message(f"{user.mention}'s points on `{interaction.guild.name}` are **{point}**.")
       
@@ -33,7 +33,7 @@ class Point(app_commands.Group):
       for i, userPoint in enumerate(userPoints):
           user_id = userPoint[0]
           point = userPoint[1]
-          user = await self.bot.fetch_user(user_id)
+          user = discord.utils.get(interaction.guild.members, id=user_id)
           if i == 0:
             rankingContents += f":first_place: **{point}** points - {user.mention} :tada:\n"
           elif i == 1:

@@ -121,9 +121,8 @@ class EventNotify(commands.Cog):
             print(e)
             
 class EventNotifyChannelResistrationView(discord.ui.View):
-    def __init__(self, bot, timeout=60):
+    def __init__(self, timeout=60):
         super().__init__(timeout=timeout)
-        self.bot = bot
         self.channel = None
         
     async def disable_all_items(self):
@@ -171,7 +170,7 @@ class EventNotifyChannelResister(app_commands.Group):
     @app_commands.checks.has_permissions(administrator=True)
     async def register(self, interaction: discord.Interaction):
         try:
-            await interaction.response.send_message("Please click the button to register the channel.", view=EventNotifyChannelResistrationView(self.bot))
+            await interaction.response.send_message("Please click the button to register the channel.", view=EventNotifyChannelResistrationView())
         except Exception as e:
             print(e)
 
