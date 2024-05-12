@@ -9,4 +9,3 @@ load_dotenv(dotenv_path)
 
 TOKEN = os.environ.get('TOKEN')
 DSN = os.environ.get('DSN')
-GUILD_ID = os.environ.get('GUILD_ID')

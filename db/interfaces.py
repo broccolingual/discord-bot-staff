@@ -34,6 +34,10 @@ class DB():
         result = self.session.query(EventNotify).filter(EventNotify.msg_id == msg_id).first()
         return result
     
+    def getMessage(self, event_id):
+        result = self.session.query(EventNotify).filter(EventNotify.event_id == event_id).first()
+        return result
+    
     def updateEvent(self, msg_id, event_id, author_id):
         self.session.query(EventNotify).filter(EventNotify.msg_id == msg_id).update({EventNotify.event_id: event_id, EventNotify.author_id: author_id})
         self.session.commit()
