@@ -7,7 +7,7 @@ import settings
     
 class DB():
     def __init__(self):
-        self.engine = create_engine(settings.DSN)
+        self.engine = create_engine(settings.DB_DSN)
         self.sessionmaker = sessionmaker(autocommit=False, autoflush=True, bind=self.engine)
         self.session = self.sessionmaker()
     

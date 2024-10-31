@@ -8,7 +8,7 @@ from discord.ext import commands, tasks
 from helpCommand import MyHelpCommand
 import settings
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("bot")
 logger.setLevel(logging.INFO)
 
 # StreamHandler作成

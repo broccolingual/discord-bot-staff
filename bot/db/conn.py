@@ -3,9 +3,7 @@ from sqlalchemy.orm import sessionmaker
 
 import settings
 
-DB_DSN = settings.DSN
-
-engine = create_engine(DB_DSN)
+engine = create_engine(settings.DB_DSN)
 SessionLocal = sessionmaker(autocommit=False, autoflush=True, bind=engine)
 
 def getDB():

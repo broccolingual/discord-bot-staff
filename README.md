@@ -1,9 +1,3 @@
-# DSN
-
-.envに以下の通り記述
-
-`DSN="mysql+pymysql://{db_user}:{db_user_pass}@{db_host}/{db_name}?charset=utf8mb4"`
-
 # alembic
 
 データベース作成
@@ -13,3 +7,8 @@
 マイグレーション実行
 
 `pipenv run alembic upgrade head`
+
+# 参考記事
+
+https://zenn.dev/satonopan/articles/4256417e6c629e
+https://sqripts.com/2023/03/30/41590/

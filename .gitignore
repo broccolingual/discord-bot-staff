@@ -1,3 +1,4 @@
 .env
 __pycache__/
-/alembic/versions
+bot/alembic/versions/
+mysql/data/

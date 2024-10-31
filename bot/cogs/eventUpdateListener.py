@@ -1,4 +1,5 @@
 import datetime
+import logging
 
 import discord
 from discord import app_commands
@@ -7,6 +8,8 @@ from discord.ext import commands
 from utils import blank_interaction
 from db.interfaces import DB
 from cogs.pointManager import PointManager
+
+logger = logging.getLogger("bot").getChild("eventManager")
 
 class EventCommentForm(discord.ui.Modal):
     comment = discord.ui.TextInput(label="Contents", placeholder="I'll be a little late...", style=discord.TextStyle.long)
@@ -248,6 +251,7 @@ class EventNotifyChannelResister(app_commands.Group):
     )
     @app_commands.checks.has_permissions(administrator=True)
     async def register(self, interaction: discord.Interaction):
+        logger.info(f"command: 'notify resister' executed by {interaction.user.name}")
         try:
             await interaction.response.send_message("Please click the button to register the channel.", view=EventNotifyChannelResistrationView())
         except Exception as err:

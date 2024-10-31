@@ -1,8 +1,12 @@
+import logging
+
 import discord
 from discord import app_commands
 from discord.ext import commands
 
 from db.interfaces import DB
+
+logger = logging.getLogger("bot").getChild("pointManager")
 
 class Point(app_commands.Group):
   @app_commands.command(
@@ -10,6 +14,7 @@ class Point(app_commands.Group):
     description="Check the points a user has earned on the server",
   )
   async def earned(self, interaction: discord.Interaction, user: discord.User = None):
+      logger.info(f"command: 'point earned' executed by {interaction.user.name}")
       if user is None:
           user = interaction.user
       point = await PointManager.getPoint(interaction.guild.id, user.id)
@@ -20,6 +25,7 @@ class Point(app_commands.Group):
     description="Ranking of the points earned by users on the server",
   )
   async def ranking(self, interaction: discord.Interaction):
+      logger.info(f"command: 'point ranking' executed by {interaction.user.name}")
       userPoints = await PointManager.getUserPointsOnServer(interaction.guild.id, limit=10)
       # print(userPoints)
       if userPoints is None:
@@ -51,6 +57,7 @@ class Point(app_commands.Group):
     description="Check the rules for earning points",
   )
   async def rules(self, interaction: discord.Interaction):
+      logger.info(f"command: 'point rules' executed by {interaction.user.name}")
       await interaction.response.send_message("You can earn points by sending messages, creating invites, reacting to messages, creating threads, and joining voice channels.")
   
 
