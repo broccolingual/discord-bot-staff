@@ -1,81 +1,102 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.future import select
 
+from db.conn import get_session
 from models.event import EventNotifyChannel, EventNotify, EventJoinedUser
 from models.point import PointEarned
-import settings
     
 class DB():
-    def __init__(self):
-        self.engine = create_engine(settings.DB_DSN)
-        self.sessionmaker = sessionmaker(autocommit=False, autoflush=True, bind=self.engine)
-        self.session = self.sessionmaker()
+    @staticmethod
+    async def addEventNotifyChannel(server_id, channel_id):
+        async with get_session() as session:
+            session.add(EventNotifyChannel(server_id=server_id, channel_id=channel_id))
     
-    def addEventNotifyChannel(self, server_id, channel_id):
-        self.session.add(EventNotifyChannel(server_id=server_id, channel_id=channel_id))
-        self.session.commit()
-        return self
+    @staticmethod
+    async def getEventNotifyChannel(server_id):
+        async with get_session() as session:
+            result = await session.execute(select(EventNotifyChannel).filter(EventNotifyChannel.server_id == server_id))
+            return result.scalars().first()
     
-    def getEventNotifyChannel(self, server_id):
-        result = self.session.query(EventNotifyChannel).filter(EventNotifyChannel.server_id == server_id).first()
-        return result
+    @staticmethod
+    async def updateEventNotifyChannel(server_id, channel_id):
+        async with get_session() as session:
+            result = await session.execute(select(EventNotifyChannel).filter(EventNotifyChannel.server_id == server_id))
+            item = result.scalars().first()
+            item.channel_id = channel_id
+            session.add(item)
     
-    def updateEventNotifyChannel(self, server_id, channel_id):
-        self.session.query(EventNotifyChannel).filter(EventNotifyChannel.server_id == server_id).update({EventNotifyChannel.channel_id: channel_id})
-        self.session.commit()
-        return self
+    @staticmethod
+    async def addEvent(msg_id, event_id, author_id):
+        async with get_session() as session:
+            session.add(EventNotify(msg_id=msg_id, event_id=event_id, author_id=author_id))
     
-    def addEvent(self, msg_id, event_id, author_id):
-        self.session.add(EventNotify(msg_id=msg_id, event_id=event_id, author_id=author_id))
-        self.session.commit()
-        return self
+    @staticmethod
+    async def getEvent(msg_id):
+        async with get_session() as session:
+            result = await session.execute(select(EventNotify).filter(EventNotify.msg_id == msg_id))
+            return await result.scalars().first()
     
-    def getEvent(self, msg_id):
-        result = self.session.query(EventNotify).filter(EventNotify.msg_id == msg_id).first()
-        return result
+    @staticmethod
+    async def getMessage(event_id):
+        async with get_session() as session:
+            result = await session.execute(select(EventNotify).filter(EventNotify.event_id == event_id))
+            return result.scalars().first()
     
-    def getMessage(self, event_id):
-        result = self.session.query(EventNotify).filter(EventNotify.event_id == event_id).first()
-        return result
+    @staticmethod
+    async def updateEvent(msg_id, event_id, author_id):
+        async with get_session() as session:
+            result = await session.execute(select(EventNotify).filter(EventNotify.msg_id == msg_id))
+            item = result.scalars().first()
+            item.event_id = event_id
+            item.author_id = author_id
+            session.add(item)
     
-    def updateEvent(self, msg_id, event_id, author_id):
-        self.session.query(EventNotify).filter(EventNotify.msg_id == msg_id).update({EventNotify.event_id: event_id, EventNotify.author_id: author_id})
-        self.session.commit()
-        return self
+    @staticmethod
+    async def addJoinedUser(event_id, user_id):
+        async with get_session() as session:
+            session.add(EventJoinedUser(event_id=event_id, user_id=user_id))
     
-    def addJoinedUser(self, event_id, user_id):
-        self.session.add(EventJoinedUser(event_id=event_id, user_id=user_id))
-        self.session.commit()
-        return self
+    @staticmethod
+    async def deleteJoinedUser(event_id, user_id):
+        async with get_session() as session:
+            result = await session.execute(select(EventJoinedUser).filter(EventJoinedUser.event_id == event_id).filter(EventJoinedUser.user_id == user_id))
+            item = result.scalars().first()
+            await session.delete(item)
     
-    def deleteJoinedUser(self, event_id, user_id):
-        self.session.query(EventJoinedUser).filter(EventJoinedUser.event_id == event_id).filter(EventJoinedUser.user_id == user_id).delete()
-        self.session.commit()
-        return self
+    @staticmethod
+    async def getJoinedUsers(event_id):
+        async with get_session() as session:
+            result = await session.execute(select(EventJoinedUser).filter(EventJoinedUser.event_id == event_id).order_by(EventJoinedUser.created_at))
+            return result.scalars().all()
     
-    def getJoinedUsers(self, event_id):
-        result = self.session.query(EventJoinedUser.user_id).filter(EventJoinedUser.event_id == event_id).order_by(EventJoinedUser.created_at).all()
-        return result
+    @staticmethod
+    async def initPoint(server_id, user_id):
+        async with get_session() as session:
+            session.add(PointEarned(server_id=server_id, user_id=user_id, point=0))
     
-    def initPoint(self, server_id, user_id):
-        self.session.add(PointEarned(server_id=server_id, user_id=user_id, point=0))
-        self.session.commit()
-        return self
+    @staticmethod
+    async def updatePoint(server_id, user_id, point):
+        async with get_session() as session:
+            result = await session.execute(select(PointEarned).filter(PointEarned.server_id == server_id).filter(PointEarned.user_id == user_id))
+            item = result.scalars().first()
+            item.point += point
+            session.add(item)
     
-    def updatePoint(self, server_id, user_id, point):
-        self.session.query(PointEarned).filter(PointEarned.server_id == server_id).filter(PointEarned.user_id == user_id).update({PointEarned.point: PointEarned.point + point})
-        self.session.commit()
-        return self
+    @staticmethod
+    async def removePoint(server_id, user_id, point):
+        async with get_session() as session:
+            result = await session.execute(select(PointEarned).filter(PointEarned.server_id == server_id).filter(PointEarned.user_id == user_id))
+            item = result.scalars().first()
+            item.point -= point
+            session.add(item)
     
-    def removePoint(self, server_id, user_id, point):
-        self.session.query(PointEarned).filter(PointEarned.server_id == server_id).filter(PointEarned.user_id == user_id).update({PointEarned.point: PointEarned.point - point})
-        self.session.commit()
-        return self
+    @staticmethod
+    async def getPoint(server_id, user_id):
+        async with get_session() as session:
+            result = await session.execute(select(PointEarned).filter(PointEarned.server_id == server_id).filter(PointEarned.user_id == user_id))
+            return result.scalars().first()
     
-    def getPoint(self, server_id, user_id):
-        result = self.session.query(PointEarned).filter(PointEarned.server_id == server_id).filter(PointEarned.user_id == user_id).first()
-        return result
-    
-    def getUserPointsOnServer(self, server_id, limit=10):
-        result = self.session.query(PointEarned).filter(PointEarned.server_id == server_id).order_by(PointEarned.point.desc()).limit(limit)
-        return result
+    @staticmethod
+    async def getUserPointsOnServer(server_id, limit=10):
+        async with get_session() as session:
+            result = await session.execute(select(PointEarned).filter(PointEarned.server_id == server_id).order_by(PointEarned.point.desc()).limit(limit))
+            return result.scalars().all()

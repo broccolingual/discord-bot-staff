@@ -18,7 +18,7 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-from db.conn import DB_DSN
+import settings
 from db import base
 target_metadata = base.Base.metadata
 
@@ -42,7 +42,7 @@ def run_migrations_offline() -> None:
     """
     # url = config.get_main_option("sqlalchemy.url")
     context.configure(
-        url=DB_DSN,
+        url=settings.DB_DSN,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -61,7 +61,7 @@ def run_migrations_online() -> None:
 
     """
     conf = config.get_section(config.config_ini_section)
-    conf["sqlalchemy.url"] = DB_DSN
+    conf["sqlalchemy.url"] = settings.DB_DSN
     connectable = engine_from_config(
         conf,
         prefix="sqlalchemy.",

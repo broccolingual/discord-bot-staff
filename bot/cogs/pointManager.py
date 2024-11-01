@@ -4,7 +4,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from db.interfaces import DB
+from db.interfaces import DB as db
 
 logger = logging.getLogger("bot").getChild("pointManager")
 
@@ -27,7 +27,6 @@ class Point(app_commands.Group):
   async def ranking(self, interaction: discord.Interaction):
       logger.info(f"command: 'point ranking' executed by {interaction.user.name}")
       userPoints = await PointManager.getUserPointsOnServer(interaction.guild.id, limit=10)
-      # print(userPoints)
       if userPoints is None:
           await interaction.response.send_message("No user has earned points on this server.")
           return
@@ -98,32 +97,26 @@ class PointListener(commands.Cog):
 class PointManager():
   @staticmethod
   async def addPoint(server_id, user_id: int, point: int):
-    db = DB()
-    if db.getPoint(server_id, user_id) is None:
-      db.initPoint(server_id, user_id)
-    db.updatePoint(server_id, user_id, point)
-    # print(f"Added {point} points to {server_id} on {user_id}")
+    if await db.getPoint(server_id, user_id) is None:
+      await db.initPoint(server_id, user_id)
+    await db.updatePoint(server_id, user_id, point)
   
   @staticmethod
   async def removePoint(server_id, user_id: int, point: int):
-    db = DB()
-    if db.getPoint(server_id, user_id) is None:
-      db.initPoint(server_id, user_id)
-    db.removePoint(server_id, user_id, point)
-    # print(f"Removed {point} points to {server_id} on {user_id}")
+    if await db.getPoint(server_id, user_id) is None:
+      await db.initPoint(server_id, user_id)
+    await db.removePoint(server_id, user_id, point)
   
   @staticmethod
   async def getPoint(server_id, user_id: int):
-    db = DB()
-    if db.getPoint(server_id, user_id) is None:
-      db.initPoint(server_id, user_id)
-    point = db.getPoint(server_id, user_id)
+    if await db.getPoint(server_id, user_id) is None:
+      await db.initPoint(server_id, user_id)
+    point = await db.getPoint(server_id, user_id)
     return point.point
   
   @staticmethod
   async def getUserPointsOnServer(server_id, limit=10):
-    db = DB()
-    userPoints = db.getUserPointsOnServer(server_id, limit=limit)
+    userPoints = await db.getUserPointsOnServer(server_id, limit=limit)
     if userPoints is None:
       return None
     return [[userPoint.user_id, userPoint.point] for userPoint in userPoints]

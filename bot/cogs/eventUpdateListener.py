@@ -6,7 +6,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils import blank_interaction
-from db.interfaces import DB
+from db.interfaces import DB as db
 from cogs.pointManager import PointManager
 
 logger = logging.getLogger("bot").getChild("eventManager")
@@ -49,9 +49,8 @@ class EventView(discord.ui.View):
             return
         try:
             # database
-            db = DB()
-            db.addJoinedUser(self.event.id, interaction.user.id)
-            joiningUsers = db.getJoinedUsers(self.event.id)
+            await db.addJoinedUser(self.event.id, interaction.user.id)
+            joiningUsers = await db.getJoinedUsers(self.event.id)
             await PointManager.addPoint(interaction.guild.id, interaction.user.id, 2) # Point
         except Exception as err:
             print(err)
@@ -74,9 +73,8 @@ class EventView(discord.ui.View):
             return
         try:
             # database
-            db = DB()
-            db.deleteJoinedUser(self.event.id, interaction.user.id)
-            joiningUsers = db.getJoinedUsers(self.event.id)
+            await db.deleteJoinedUser(self.event.id, interaction.user.id)
+            joiningUsers = await db.getJoinedUsers(self.event.id)
             await PointManager.removePoint(interaction.guild.id, interaction.user.id, 2) # Point
         except Exception as err:
             print(err)
@@ -148,14 +146,13 @@ class EventNotify(commands.Cog):
             notifyView = EventView(self.bot, e, timeout=86400) # timeout - 24h
             
             # database
-            db = DB()
-            channel = db.getEventNotifyChannel(e.guild.id)
+            channel = await db.getEventNotifyChannel(e.guild.id)
             if channel is None:
                 return
             notifyChan = self.bot.get_partial_messageable(channel.channel_id)
             embed = await notifyChan.send(embeds=[notifyEmbed], view=notifyView)
-            db.addEvent(embed.id, e.id, e.creator.id)
-            db.addJoinedUser(e.id, e.creator.id)
+            await db.addEvent(embed.id, e.id, e.creator.id)
+            await db.addJoinedUser(e.id, e.creator.id)
             await PointManager.addPoint(e.guild.id, e.creator.id, 5) # Point
         except Exception as err:
             print(err)
@@ -164,12 +161,11 @@ class EventNotify(commands.Cog):
     async def on_scheduled_event_update(self, before, after):
         try:
             # database
-            db = DB()
-            notifyChanData = db.getEventNotifyChannel(before.guild.id)
+            notifyChanData = await db.getEventNotifyChannel(before.guild.id)
             if notifyChanData is None:
                 return
             notifyChan = self.bot.get_partial_messageable(notifyChanData.channel_id)
-            notifyMsgData = db.getMessage(before.id)
+            notifyMsgData = await db.getMessage(before.id)
             if notifyMsgData is None:
                 return
             notifyMsg = await notifyChan.fetch_message(notifyMsgData.msg_id)
@@ -232,13 +228,12 @@ class EventNotifyChannelResistrationView(discord.ui.View):
                 await interaction.response.send_message("Please select a channel.")
                 return
             # database
-            db = DB()
-            registeredId = db.getEventNotifyChannel(interaction.guild.id)
+            registeredId = await db.getEventNotifyChannel(interaction.guild.id)
             if registeredId is None:
-                db.addEventNotifyChannel(interaction.guild.id, self.channel.values[0].id)
+                await db.addEventNotifyChannel(interaction.guild.id, self.channel.values[0].id)
                 await interaction.response.edit_message(content="Notify channel is registered.", view=None)
             else:
-                db.updateEventNotifyChannel(interaction.guild.id, self.channel.values[0].id)
+                await db.updateEventNotifyChannel(interaction.guild.id, self.channel.values[0].id)
                 await interaction.response.edit_message(content="Notify channel is updated.", view=None)
         except Exception as err:
             await interaction.response.edit_message(content="Notify channel is not updated by some reason.", view=None)
