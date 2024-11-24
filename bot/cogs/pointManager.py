@@ -7,6 +7,7 @@ from discord.ext import commands
 from db.interfaces import DB as db
 
 logger = logging.getLogger("bot").getChild("pointManager")
+logger.setLevel(logging.DEBUG)
 
 class Point(app_commands.Group):
   @app_commands.command(
@@ -68,30 +69,41 @@ class PointListener(commands.Cog):
   async def on_message(self, message):
     if message.author.bot:
       return
+    logger.debug(f"point added to {message.author.name} by sending message")
     await PointManager.addPoint(message.guild.id, message.author.id, 2)
   
   @commands.Cog.listener()
   async def on_invite_create(self, invite):
     if invite.inviter.bot:
       return
+    logger.debug(f"point added to {invite.inviter.name} by creating invite")
     await PointManager.addPoint(invite.guild.id, invite.inviter.id, 5)
     
   @commands.Cog.listener()
-  async def on_raw_reaction_add(self, reaction, user):
-    if user.bot:
+  async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
+    if payload.member is None or payload.member.bot:
       return
-    await PointManager.addPoint(reaction.message.guild.id, user.id, 1)
+    guild = self.bot.get_guild(payload.guild_id)
+    if guild is None:
+      return
+    user = guild.get_member(payload.user_id)
+    if user is None or user.bot:
+      return
+    logger.debug(f"point added to {user.name} by reacting to message")
+    await PointManager.addPoint(payload.guild_id, payload.user_id, 1)
   
   @commands.Cog.listener()
   async def on_thread_create(self, thread):
     if thread.owner.bot:
       return
+    logger.debug(f"point added to {thread.owner.name} by creating thread")
     await PointManager.addPoint(thread.guild.id, thread.owner.id, 5)
   
   @commands.Cog.listener()
   async def on_voice_state_update(self, member, before, after):
     if member.bot or after.channel is not None:
       return
+    logger.debug(f"point added to {member.name} by leaveing voice channel")
     await PointManager.addPoint(member.guild.id, member.id, 5)
 
 class PointManager():

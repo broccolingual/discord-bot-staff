@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 
 import settings
                 
-engine_async = create_async_engine(settings.DB_DSN, echo=True)
+engine_async = create_async_engine(settings.DB_DSN)
 
 @asynccontextmanager    
 async def get_session():
