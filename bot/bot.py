@@ -8,7 +8,7 @@ from discord.ext import commands, tasks
 from helpCommand import MyHelpCommand
 import settings
 
-logger = logging.getLogger("bot")
+logger = logging.getLogger("discord.bot")
 logger.setLevel(logging.INFO)
 
 # StreamHandler作成
@@ -79,3 +79,4 @@ if __name__ == "__main__":
         bot.run(settings.TOKEN, reconnect=True, log_handler=handler, log_level=logging.INFO)
     except KeyboardInterrupt:
         logger.info('Bot interrupted.')
+

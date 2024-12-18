@@ -1,4 +1,5 @@
 import logging
+import traceback
 
 import discord
 from discord import app_commands
@@ -6,7 +7,7 @@ from discord.ext import commands
 
 from db.interfaces import DB as db
 
-logger = logging.getLogger("bot").getChild("pointManager")
+logger = logging.getLogger("discord.bot").getChild("pointManager")
 logger.setLevel(logging.DEBUG)
 
 class Point(app_commands.Group):
@@ -15,50 +16,58 @@ class Point(app_commands.Group):
     description="Check the points a user has earned on the server",
   )
   async def earned(self, interaction: discord.Interaction, user: discord.User = None):
-      logger.info(f"command: 'point earned' executed by {interaction.user.name}")
       if user is None:
-          user = interaction.user
-      point = await PointManager.getPoint(interaction.guild.id, user.id)
-      await interaction.response.send_message(f"{user.mention}'s points on `{interaction.guild.name}` are **{point}**.")
+        user = interaction.user
+      try:
+        point = await PointManager.getPoint(interaction.guild.id, user.id)
+        await interaction.response.send_message(f"{user.mention}'s points on `{interaction.guild.name}` are **{point}**.")
+      except Exception as e:
+        await interaction.response.send_message("Oops... An error occurred while fetching the points.", ephemeral=True, delete_after=10)
       
   @app_commands.command(
     name="ranking",
     description="Ranking of the points earned by users on the server",
   )
   async def ranking(self, interaction: discord.Interaction):
-      logger.info(f"command: 'point ranking' executed by {interaction.user.name}")
+    try:
       userPoints = await PointManager.getUserPointsOnServer(interaction.guild.id, limit=10)
-      if userPoints is None:
-          await interaction.response.send_message("No user has earned points on this server.")
-          return
-      embed = discord.Embed(title=":medal: Community Point Ranking",
-                            description=f"Top 10 users on `{interaction.guild.name}`",
-                            color=discord.Colour.yellow())
-      rankingContents = ""
-      for i, userPoint in enumerate(userPoints):
+      if not userPoints:
+        await interaction.response.send_message("No user has earned points on this server.", ephemeral=True, delete_after=10)
+      else:
+        embed = discord.Embed(title=":medal: Community Point Ranking",
+                              description=f"Top 10 users on `{interaction.guild.name}`",
+                              color=discord.Colour.yellow())
+        rankingContents = ""
+        for i, userPoint in enumerate(userPoints):
           user_id = userPoint[0]
           point = userPoint[1]
           user = discord.utils.get(interaction.guild.members, id=user_id)
+          user_mention = "*unknown user*"
+          if user:
+            user_mention = user.mention
+
           if i == 0:
-            rankingContents += f":first_place: **{point}** points - {user.mention} :tada:\n"
+            rankingContents += f":first_place: **{point}** points - {user_mention} :tada:\n"
           elif i == 1:
-            rankingContents += f":second_place: **{point}** points - {user.mention}\n"
+            rankingContents += f":second_place: **{point}** points - {user_mention}\n"
           elif i == 2:
-            rankingContents += f":third_place: **{point}** points - {user.mention}\n"
+            rankingContents += f":third_place: **{point}** points - {user_mention}\n"
           elif i == 9:
-              break
+            break
           else:
-              rankingContents += f"`{i+1}.` **{point}** points - {user.mention}\n"
-      embed.add_field(name="Ranking", value=rankingContents, inline=False)
-      await interaction.response.send_message(embed=embed)
+            rankingContents += f"`{i+1}.` **{point}** points - {user_mention}\n"
+        embed.add_field(name="Ranking", value=rankingContents, inline=False)
+        await interaction.response.send_message(embed=embed)
+    except Exception as e:
+      await interaction.response.send_message("Oops... An error occurred while fetching the points.", ephemeral=True, delete_after=10)
+      traceback.print_exception(type(e), e, e.__traceback__)
   
   @app_commands.command(
     name="rules",
     description="Check the rules for earning points",
   )
   async def rules(self, interaction: discord.Interaction):
-      logger.info(f"command: 'point rules' executed by {interaction.user.name}")
-      await interaction.response.send_message("You can earn points by sending messages, creating invites, reacting to messages, creating threads, and joining voice channels.")
+    await interaction.response.send_message("You can earn points by sending messages, creating invites, reacting to messages, creating threads, and joining voice channels.")
   
 
 class PointListener(commands.Cog):
@@ -136,3 +145,4 @@ class PointManager():
 async def setup(bot):
   await bot.add_cog(PointListener(bot))
   bot.tree.add_command(Point(name="point", description="Commands related to community points."))
+

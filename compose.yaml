@@ -15,7 +15,7 @@ services:
     volumes:
       - ./mysql/data:/var/lib/mysql
       - ./mysql/conf.d:/etc/mysql/conf.d
-    restart: always
+    restart: unless-stopped
     networks:
       - internal
 
@@ -29,7 +29,7 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-    restart: always
+    restart: unless-stopped
     networks:
       - internal
 

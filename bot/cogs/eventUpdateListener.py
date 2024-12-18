@@ -1,5 +1,6 @@
 import datetime
 import logging
+import traceback
 
 import discord
 from discord import app_commands
@@ -9,7 +10,7 @@ from utils import blank_interaction
 from db.interfaces import DB as db
 from cogs.pointManager import PointManager
 
-logger = logging.getLogger("bot").getChild("eventManager")
+logger = logging.getLogger("discord.bot").getChild("eventManager")
 
 class EventCommentForm(discord.ui.Modal):
     comment = discord.ui.TextInput(label="Contents", placeholder="I'll be a little late...", style=discord.TextStyle.long)
@@ -26,7 +27,10 @@ class EventCommentForm(discord.ui.Modal):
         oldValue += f"\nFrom {interaction.user.mention} : **{self.comment}**"
         oldEmbed.set_field_at(4, name=oldEmbed.fields[4].name, value=oldValue)
         await self.origInteraction.message.edit(embeds=[oldEmbed])
-        await blank_interaction(interaction) # 「インタラクションに失敗しました」対策
+        await interaction.response.send_message("Your comment has sended correctly.", ephemeral=True, delete_after=10)
+        
+    async def on_error(self, interaction: discord.Interaction, e: Exception):
+        traceback.print_exception(type(e), e, e.__traceback__)
 
 class EventView(discord.ui.View):
     def __init__(self, bot, event: discord.ScheduledEvent, timeout=86400): # timeout - 24h
@@ -45,21 +49,26 @@ class EventView(discord.ui.View):
                        style=discord.ButtonStyle.success)
     async def join(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.event is None:
-            await blank_interaction(interaction)
+            await interaction.response.send_message("Failed to retrieve event.", ephemeral=True, delete_after=10)
             return
         try:
-            # database
+            joining_user_ids = [o.user_id for o in await db.getJoinedUsers(self.event.id)]
+            if interaction.user.id in joining_user_ids:
+                await interaction.response.send_message("You have already joined.", ephemeral=True, delete_after=10)
+                return
             await db.addJoinedUser(self.event.id, interaction.user.id)
-            joiningUsers = await db.getJoinedUsers(self.event.id)
+            joiningUserIDs.append(interaction.user.id)
             await PointManager.addPoint(interaction.guild.id, interaction.user.id, 2) # Point
-        except Exception as err:
-            print(err)
-            await blank_interaction(interaction)
+        except Exception as e:
+            await interaction.response.send_message("Oops... An error occurred during processing.", ephemeral=True, delete_after=10)
+            traceback.print_exception(type(e), e, e.__traceback__)
             return
+        
+        # update embed
         oldEmbed = interaction.message.embeds[0] # get old embed
         newValue = ""
-        for i, joiningUser in enumerate(joiningUsers):
-            user = self.bot.get_user(joiningUser.user_id)
+        for i, joining_user_id in enumerate(joining_user_ids):
+            user = self.bot.get_user(joining_user_id)
             if user is not None:
                 newValue += f"`{i+1}.` {user.mention}\n"
         oldEmbed.set_field_at(3, name=oldEmbed.fields[3].name, value=newValue)
@@ -69,21 +78,26 @@ class EventView(discord.ui.View):
                        style=discord.ButtonStyle.red)
     async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.event is None:
-            await blank_interaction(interaction)
+            await interaction.response.send_message("Failed to retrieve event.", ephemeral=True, delete_after=10)
             return
         try:
-            # database
+            joining_user_ids = [o.user_id for o in await db.getJoinedUsers(self.event.id)]
+            if interaction.user.id not in joining_user_ids:
+                await interaction.response.send_message("You are not participating in this event.", ephemeral=True, delete_after=10)
+                return
             await db.deleteJoinedUser(self.event.id, interaction.user.id)
-            joiningUsers = await db.getJoinedUsers(self.event.id)
+            joiningUserIDs.remove(interaction.user.id)
             await PointManager.removePoint(interaction.guild.id, interaction.user.id, 2) # Point
-        except Exception as err:
-            print(err)
-            await blank_interaction(interaction)
+        except Exception as e:
+            await interaction.response.send_message("Oops... An error occurred during processing.", ephemeral=True, delete_after=10)
+            traceback.print_exception(type(e), e, e.__traceback__)
             return
+        
+        # update embed
         oldEmbed = interaction.message.embeds[0] # get old embed
         newValue = ""
-        for i, joiningUser in enumerate(joiningUsers):
-            user = self.bot.get_user(joiningUser.user_id)
+        for i, joining_user_id in enumerate(joining_user_ids):
+            user = self.bot.get_user(joining_user_id)
             if user is not None:
                 newValue += f"`{i+1}.` {user.mention}\n"
         oldEmbed.set_field_at(3, name=oldEmbed.fields[3].name, value=newValue)
@@ -94,32 +108,44 @@ class EventView(discord.ui.View):
     async def comment(self, interaction: discord.Interaction, button: discord.ui.Button):
         try:
             await interaction.response.send_modal(EventCommentForm(timeout=86400, origInteraction=interaction))
-        except Exception as err:
-            print(err)
+        except Exception as e:
+            await interaction.response.send_message("Oops... An error occurred during processing.", ephemeral=True, delete_after=10)
+            print(e)
             
     @discord.ui.button(label="Start event",
                        style=discord.ButtonStyle.gray)
     async def start(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if self.event is None or self.event.creator != interaction.user:
-            await blank_interaction(interaction)
+        if self.event is None:
+            await interaction.response.send_message("Failed to retrieve event.", ephemeral=True, delete_after=10)
             return
+        
+        if self.event.creator != interaction.user:
+            await interaction.response.send_message("You are not the creator of this event.", ephemeral=True, delete_after=10)
+            return
+        
         if self.event.status == discord.EventStatus.scheduled:
             await self.event.start()
+            await interaction.response.send_message("Event has started!", ephemeral=True, delete_after=10)
         elif self.event.status == discord.EventStatus.active or self.event.status == discord.EventStatus.ended:
-            pass
-        await blank_interaction(interaction)
-        
+            await interaction.response.send_message("This event is already active.", ephemeral=True, delete_after=10)
+            
     @discord.ui.button(label="Cancel/End event",
                        style=discord.ButtonStyle.gray)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if self.event is None or self.event.creator != interaction.user:
-            await blank_interaction(interaction)
+        if self.event is None:
+            await interaction.response.send_message("Failed to retrieve event.", ephemeral=True, delete_after=10)
             return
+        
+        if self.event.creator != interaction.user:
+            await interaction.response.send_message("You are not the creator of this event.", ephemeral=True, delete_after=10)
+            return
+        
         if self.event.status == discord.EventStatus.active:
             await self.event.end()
+            await interaction.response.send_message("Event was ended correctly.", ephemeral=True, delete_after=10)
         elif self.event.status == discord.EventStatus.scheduled:
             await self.event.cancel()
-        await blank_interaction(interaction)
+            await interaction.response.send_message("Event was canceled correctly.", ephemeral=True, delete_after=10)
 
 class EventNotify(commands.Cog):
     def __init__(self, bot):
