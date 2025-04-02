@@ -1,15 +1,21 @@
-FROM python:3.12-slim
+ARG PYTHON_VERSION=3.12
 
-# Set the working directory
-RUN mkdir -p /usr/src/app
-WORKDIR /usr/src/app
+FROM ghcr.io/astral-sh/uv:python${PYTHON_VERSION}-bookworm-slim
 
-COPY requirements.txt .
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
 
-# Install dependencies
-RUN pip install -U pip
-RUN pip install --no-cache-dir --upgrade -r requirements.txt
+WORKDIR /app
 
-COPY . .
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --frozen --no-install-project --no-dev
 
-CMD ["python", "bot.py"]
+ADD . /app
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
+
+ENV PATH="/app/.venv/bin:$PATH"
+
+CMD ["uv", "run", "bot.py"]
