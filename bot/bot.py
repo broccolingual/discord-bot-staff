@@ -12,7 +12,7 @@ import settings
 logger = logging.getLogger("discord")
 if logger.hasHandlers():
     logger.handlers.clear()
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter(
     '%(asctime)s:%(name)s:%(lineno)d:%(levelname)s:%(message)s'))
