@@ -10,7 +10,7 @@ from utils import blank_interaction
 from db.interfaces import DB as db
 from cogs.pointManager import PointManager
 
-logger = logging.getLogger("discord.bot").getChild("eventManager")
+logger = logging.getLogger("discord").getChild("eventManager")
 
 class EventCommentForm(discord.ui.Modal):
     comment = discord.ui.TextInput(label="Contents", placeholder="I'll be a little late...", style=discord.TextStyle.long)
@@ -57,7 +57,7 @@ class EventView(discord.ui.View):
                 await interaction.response.send_message("You have already joined.", ephemeral=True, delete_after=10)
                 return
             await db.addJoinedUser(self.event.id, interaction.user.id)
-            joiningUserIDs.append(interaction.user.id)
+            joining_user_ids.append(interaction.user.id)
             await PointManager.addPoint(interaction.guild.id, interaction.user.id, 2) # Point
         except Exception as e:
             await interaction.response.send_message("Oops... An error occurred during processing.", ephemeral=True, delete_after=10)
@@ -86,7 +86,7 @@ class EventView(discord.ui.View):
                 await interaction.response.send_message("You are not participating in this event.", ephemeral=True, delete_after=10)
                 return
             await db.deleteJoinedUser(self.event.id, interaction.user.id)
-            joiningUserIDs.remove(interaction.user.id)
+            joining_user_ids.remove(interaction.user.id)
             await PointManager.removePoint(interaction.guild.id, interaction.user.id, 2) # Point
         except Exception as e:
             await interaction.response.send_message("Oops... An error occurred during processing.", ephemeral=True, delete_after=10)

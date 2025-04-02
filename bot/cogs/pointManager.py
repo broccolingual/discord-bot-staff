@@ -7,8 +7,7 @@ from discord.ext import commands
 
 from db.interfaces import DB as db
 
-logger = logging.getLogger("discord.bot").getChild("pointManager")
-logger.setLevel(logging.DEBUG)
+logger = logging.getLogger("discord").getChild("pointManager")
 
 class Point(app_commands.Group):
   @app_commands.command(
