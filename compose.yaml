@@ -33,7 +33,7 @@ services:
     develop:
       watch:
         - action: sync
-          path: .
+          path: ./bot
           target: /app
           ignore:
             - .venv/

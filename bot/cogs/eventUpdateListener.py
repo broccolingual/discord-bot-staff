@@ -314,6 +314,11 @@ class EventNotifyChannelResister(app_commands.Group):
         except Exception as err:
             print(err)
 
+    @register.error
+    async def register_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+        if isinstance(error, app_commands.MissingPermissions):
+            await interaction.response.send_message("You don't have permission to use this command.", ephemeral=True, delete_after=10)
+
 
 async def setup(bot):
     await bot.add_cog(EventNotify(bot))

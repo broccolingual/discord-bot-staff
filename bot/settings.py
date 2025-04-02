@@ -1,5 +1,4 @@
 import os
-from os.path import join, dirname
 
 TOKEN = os.environ.get('TOKEN')
 

@@ -5,7 +5,6 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from helpCommand import MyHelpCommand
 import settings
 
 # Set up logging
@@ -22,11 +21,10 @@ logger.addHandler(handler)
 class StaffBot(commands.Bot):
     def __init__(self):
         super().__init__(
-            command_prefix="^",
+            command_prefix="/",
             intents=discord.Intents.all(),
-            help_command=MyHelpCommand(),
             case_insensitive=True,
-            activity=discord.Game(name="^help"),
+            activity=discord.Game(name="/help"),
         )
 
     async def setup_hook(self):
@@ -75,9 +73,26 @@ class StaffBot(commands.Bot):
 bot = StaffBot()
 
 
-@bot.tree.command(name="ping")
+@bot.tree.command(name="ping", description="Check if the bot is alive")
 async def ping(interaction: discord.Interaction):
     await interaction.response.send_message(f"Pong! ({round(bot.latency * 1000)}ms)")
+
+
+@bot.tree.command(name="help", description="Shows help about the bot, a command, or a category")
+async def help(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="Help", description="List of all commands", color=discord.Colour.blurple())
+    for command in bot.tree.walk_commands():
+        if command is None:
+            continue
+        if command is not discord.app_commands.Group:
+            embed.add_field(name=command.name,
+                            value=command.description, inline=False)
+        else:
+            embed.add_field(name=command.name, value="\n".join(
+                [f"`{subcommand.name}`: {subcommand.description}" for subcommand in command.children]), inline=False)
+
+    await interaction.response.send_message(embed=embed)
 
 if __name__ == "__main__":
     bot.run(settings.TOKEN, reconnect=True,
