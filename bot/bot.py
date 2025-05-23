@@ -2,13 +2,11 @@ import logging
 import os
 
 from aiohttp import web
-import asyncio
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
 import settings
-from cogs.eventUpdateListener import EventView()
 
 # Set up logging
 logger = logging.getLogger("discord")
@@ -37,8 +35,7 @@ class StaffBot(commands.Bot):
             command_prefix="/",
             intents=discord.Intents.all(),
             case_insensitive=True,
-            activity=discord.Game(name="/help"),
-        )
+            activity=discord.Game(name="/help"))
 
     async def setup_hook(self):
         # load extensions
@@ -56,7 +53,7 @@ class StaffBot(commands.Bot):
         logger.info(f'Bot ready, Logged in as {self.user.name}.')
 
         # add View to the bot
-        self.add_view(EventView())
+        # TODO
 
     async def on_connect(self):
         logger.info(f'Bot connected. (discord.py: v{discord.__version__})')
