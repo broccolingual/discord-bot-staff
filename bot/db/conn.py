@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 import settings
-                
+
 engine_async = create_async_engine(settings.DB_DSN)
 
 @asynccontextmanager    
@@ -23,5 +23,4 @@ async def get_session():
             await session.rollback()
             raise
         finally:
-            await session.close()
-        
+            await session.close()  
