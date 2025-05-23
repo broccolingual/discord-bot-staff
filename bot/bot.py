@@ -1,12 +1,12 @@
 import logging
 import os
 
-from aiohttp import web
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
 import settings
+from supabase_db.interfaces import SupabaseDB
 
 # Set up logging
 logger = logging.getLogger("discord")
@@ -19,16 +19,6 @@ handler.setFormatter(logging.Formatter(
 logger.addHandler(handler)
 
 
-async def start_healthcheck_server():
-    app = web.Application()
-    app.router.add_get(
-        "/health", lambda request: web.Response(text="OK"))
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", 8080)
-    await site.start()
-
-
 class StaffBot(commands.Bot):
     def __init__(self):
         super().__init__(
@@ -36,6 +26,7 @@ class StaffBot(commands.Bot):
             intents=discord.Intents.all(),
             case_insensitive=True,
             activity=discord.Game(name="/help"))
+        self.db = SupabaseDB()
 
     async def setup_hook(self):
         # load extensions
@@ -45,9 +36,7 @@ class StaffBot(commands.Bot):
         synced_commands = await self.tree.sync()
         logger.info(f"Synced {len(synced_commands)} commands")
 
-        # start healthcheck server
-        self.loop.create_task(start_healthcheck_server())
-        logger.info("Healthcheck server started on port 8080")
+        await self.db.get_client()
 
     async def on_ready(self):
         logger.info(f'Bot ready, Logged in as {self.user.name}.')
