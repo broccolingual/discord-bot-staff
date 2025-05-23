@@ -5,12 +5,14 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from db.interfaces import DB as db
-
-logger = logging.getLogger("discord").getChild("pointManager")
+logger = logging.getLogger("discord").getChild("point_manager")
 
 
 class Point(app_commands.Group):
+    def __init__(self, bot, name, description):
+        super().__init__(name=name, description=description)
+        self.bot = bot
+
     @app_commands.command(
         name="earned",
         description="Check the points a user has earned on the server",
@@ -19,7 +21,7 @@ class Point(app_commands.Group):
         if user is None:
             user = interaction.user
         try:
-            point = await PointManager.getPoint(interaction.guild.id, user.id)
+            point = await PointManager.getPoint(self.bot, interaction.guild.id, user.id)
             await interaction.response.send_message(f"{user.mention}'s points on `{interaction.guild.name}` are **{point}**.")
         except Exception as e:
             await interaction.response.send_message("Oops... An error occurred while fetching the points.", ephemeral=True, delete_after=10)
@@ -30,7 +32,7 @@ class Point(app_commands.Group):
     )
     async def ranking(self, interaction: discord.Interaction):
         try:
-            userPoints = await PointManager.getUserPointsOnServer(interaction.guild.id, limit=10)
+            userPoints = await PointManager.getUserPointsOnServer(self.bot, interaction.guild.id, limit=10)
             if not userPoints:
                 await interaction.response.send_message("No user has earned points on this server.", ephemeral=True, delete_after=10)
             else:
@@ -80,17 +82,13 @@ class PointListener(commands.Cog):
     async def on_message(self, message):
         if message.author.bot:
             return
-        logger.debug(
-            f"point added to {message.author.name} by sending message")
-        await PointManager.addPoint(message.guild.id, message.author.id, 2)
+        await PointManager.addPoint(self.bot, message.guild.id, message.author.id, 2)
 
     @commands.Cog.listener()
     async def on_invite_create(self, invite):
         if invite.inviter.bot:
             return
-        logger.debug(
-            f"point added to {invite.inviter.name} by creating invite")
-        await PointManager.addPoint(invite.guild.id, invite.inviter.id, 5)
+        await PointManager.addPoint(self.bot, invite.guild.id, invite.inviter.id, 5)
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
@@ -102,53 +100,56 @@ class PointListener(commands.Cog):
         user = guild.get_member(payload.user_id)
         if user is None or user.bot:
             return
-        logger.debug(f"point added to {user.name} by reacting to message")
-        await PointManager.addPoint(payload.guild_id, payload.user_id, 1)
+        await PointManager.addPoint(self.bot, payload.guild_id, payload.user_id, 1)
 
     @commands.Cog.listener()
     async def on_thread_create(self, thread):
         if thread.owner.bot:
             return
-        logger.debug(f"point added to {thread.owner.name} by creating thread")
         await PointManager.addPoint(thread.guild.id, thread.owner.id, 5)
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
         if member.bot or after.channel is not None:
             return
-        logger.debug(f"point added to {member.name} by leaveing voice channel")
-        await PointManager.addPoint(member.guild.id, member.id, 5)
+        await PointManager.addPoint(self.bot, member.guild.id, member.id, 5)
 
 
 class PointManager():
     @staticmethod
-    async def addPoint(server_id, user_id: int, point: int):
-        if await db.getPoint(server_id, user_id) is None:
-            await db.initPoint(server_id, user_id)
-        await db.updatePoint(server_id, user_id, point)
+    async def addPoint(bot, server_id, user_id: int, point: int):
+        current_points = await bot.db.get_earned_point(server_id, user_id)
+        if current_points is None:
+            await bot.db.init_earned_point(server_id, user_id)
+        await bot.db.update_earned_point(server_id, user_id, current_points["point"] + point)
 
     @staticmethod
-    async def removePoint(server_id, user_id: int, point: int):
-        if await db.getPoint(server_id, user_id) is None:
-            await db.initPoint(server_id, user_id)
-        await db.removePoint(server_id, user_id, point)
+    async def removePoint(bot, server_id, user_id: int, point: int):
+        current_points = await bot.db.get_earned_point(server_id, user_id)
+        if current_points is None:
+            await bot.db.init_earned_point(server_id, user_id)
+        if current_points["point"] - point < 0:
+            point = 0
+        else:
+            point = current_points["point"] - point
+        await bot.db.remove_earned_point(server_id, user_id, point)
 
     @staticmethod
-    async def getPoint(server_id, user_id: int):
-        if await db.getPoint(server_id, user_id) is None:
-            await db.initPoint(server_id, user_id)
-        point = await db.getPoint(server_id, user_id)
-        return point.point
+    async def getPoint(bot, server_id, user_id: int):
+        if await bot.db.get_earned_point(server_id, user_id) is None:
+            await bot.db.init_earned_point(server_id, user_id)
+        point = await bot.db.get_earned_point(server_id, user_id)
+        return point["point"]
 
     @staticmethod
-    async def getUserPointsOnServer(server_id, limit=10):
-        userPoints = await db.getUserPointsOnServer(server_id, limit=limit)
-        if userPoints is None:
+    async def getUserPointsOnServer(bot, server_id, limit=10):
+        user_points = await bot.db.get_user_earned_points_on_server(server_id, limit=limit)
+        if user_points is None:
             return None
-        return [[userPoint.user_id, userPoint.point] for userPoint in userPoints]
+        return [[user_point["user_id"], user_point["point"]] for user_point in user_points]
 
 
 async def setup(bot):
     await bot.add_cog(PointListener(bot))
     bot.tree.add_command(
-        Point(name="point", description="Commands related to community points."))
+        Point(bot, name="point", description="Commands related to community points."))

@@ -6,6 +6,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 import settings
+from supabase_db.interfaces import SupabaseDB
 
 # Set up logging
 logger = logging.getLogger("discord")
@@ -24,8 +25,8 @@ class StaffBot(commands.Bot):
             command_prefix="/",
             intents=discord.Intents.all(),
             case_insensitive=True,
-            activity=discord.Game(name="/help"),
-        )
+            activity=discord.Game(name="/help"))
+        self.db = SupabaseDB()
 
     async def setup_hook(self):
         # load extensions
@@ -35,8 +36,13 @@ class StaffBot(commands.Bot):
         synced_commands = await self.tree.sync()
         logger.info(f"Synced {len(synced_commands)} commands")
 
+        await self.db.get_client()
+
     async def on_ready(self):
         logger.info(f'Bot ready, Logged in as {self.user.name}.')
+
+        # add View to the bot
+        # TODO
 
     async def on_connect(self):
         logger.info(f'Bot connected. (discord.py: v{discord.__version__})')

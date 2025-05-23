@@ -1,24 +1,4 @@
 services:
-  mysql:
-    build:
-      context: ./mysql
-      dockerfile: Dockerfile
-    env_file: .env
-    environment:
-      TZ: Asia/Tokyo
-    healthcheck:
-      test: mysqladmin ping -h localhost
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
-    volumes:
-      - ./mysql/data:/var/lib/mysql
-      - ./mysql/conf.d:/etc/mysql/conf.d
-    restart: unless-stopped
-    networks:
-      - internal
-
   bot:
     build:
       context: ./bot
@@ -26,9 +6,6 @@ services:
     env_file: .env
     environment:
       TZ: Asia/Tokyo
-    depends_on:
-      mysql:
-        condition: service_healthy
     restart: unless-stopped
     develop:
       watch:
@@ -39,10 +16,3 @@ services:
             - .venv/
         - action: rebuild
           path: ./pyproject.toml
-
-    networks:
-      - internal
-
-networks:
-  internal:
-    driver: bridge

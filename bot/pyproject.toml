@@ -5,12 +5,9 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "aiomysql>=0.2.0",
-    "alembic>=1.15.2",
+    "aiohttp>=3.11.18",
     "cryptography>=44.0.2",
     "discord-py>=2.4.0",
-    "pymysql>=1.1.1",
     "requests>=2.32.3",
-    "sqlalchemy>=2.0.40",
     "supabase>=2.15.1",
 ]
