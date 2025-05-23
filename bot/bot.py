@@ -8,6 +8,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 import settings
+from cogs.eventUpdateListener import EventView()
 
 # Set up logging
 logger = logging.getLogger("discord")
@@ -49,9 +50,13 @@ class StaffBot(commands.Bot):
 
         # start healthcheck server
         self.loop.create_task(start_healthcheck_server())
+        logger.info("Healthcheck server started on port 8080")
 
     async def on_ready(self):
         logger.info(f'Bot ready, Logged in as {self.user.name}.')
+
+        # add View to the bot
+        self.add_view(EventView())
 
     async def on_connect(self):
         logger.info(f'Bot connected. (discord.py: v{discord.__version__})')

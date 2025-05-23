@@ -49,7 +49,8 @@ class EventView(discord.ui.View):
         await self.disable_all_items()
 
     @discord.ui.button(label="Join",
-                       style=discord.ButtonStyle.success)
+                       style=discord.ButtonStyle.success,
+                       custom_id="join_event_btn")
     async def join(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.event is None:
             await interaction.response.send_message("Failed to retrieve event.", ephemeral=True, delete_after=10)
@@ -78,7 +79,8 @@ class EventView(discord.ui.View):
         await interaction.response.edit_message(embed=oldEmbed)
 
     @discord.ui.button(label="Decline",
-                       style=discord.ButtonStyle.red)
+                       style=discord.ButtonStyle.red,
+                       custom_id="decline_event_btn")
     async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.event is None:
             await interaction.response.send_message("Failed to retrieve event.", ephemeral=True, delete_after=10)
@@ -106,7 +108,8 @@ class EventView(discord.ui.View):
         await interaction.response.edit_message(embed=oldEmbed)
 
     @discord.ui.button(label="Leave a comment",
-                       style=discord.ButtonStyle.blurple)
+                       style=discord.ButtonStyle.blurple,
+                       custom_id="comment_event_btn")
     async def comment(self, interaction: discord.Interaction, button: discord.ui.Button):
         try:
             await interaction.response.send_modal(EventCommentForm(timeout=86400, origInteraction=interaction))
@@ -114,7 +117,8 @@ class EventView(discord.ui.View):
             await interaction.response.send_message("Oops... An error occurred during processing.", ephemeral=True, delete_after=10)
 
     @discord.ui.button(label="Start event",
-                       style=discord.ButtonStyle.gray)
+                       style=discord.ButtonStyle.gray,
+                       custom_id="start_event_btn")
     async def start(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.event is None:
             await interaction.response.send_message("Failed to retrieve event.", ephemeral=True, delete_after=10)
@@ -131,7 +135,8 @@ class EventView(discord.ui.View):
             await interaction.response.send_message("This event is already active.", ephemeral=True, delete_after=10)
 
     @discord.ui.button(label="Cancel/End event",
-                       style=discord.ButtonStyle.gray)
+                       style=discord.ButtonStyle.gray,
+                       custom_id="cancel_event_btn")
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.event is None:
             await interaction.response.send_message("Failed to retrieve event.", ephemeral=True, delete_after=10)
