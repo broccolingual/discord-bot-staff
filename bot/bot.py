@@ -1,6 +1,8 @@
 import logging
 import os
 
+from aiohttp import web
+import asyncio
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
@@ -16,6 +18,16 @@ handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter(
     '%(asctime)s:%(name)s:%(lineno)d:%(levelname)s:%(message)s'))
 logger.addHandler(handler)
+
+
+async def start_healthcheck_server():
+    app = web.Application()
+    app.router.add_get(
+        "/health", lambda request: web.Response(text="OK"))
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", 8080)
+    await site.start()
 
 
 class StaffBot(commands.Bot):
@@ -34,6 +46,9 @@ class StaffBot(commands.Bot):
                 await self.load_extension(f"cogs.{filename[:-3]}")
         synced_commands = await self.tree.sync()
         logger.info(f"Synced {len(synced_commands)} commands")
+
+        # start healthcheck server
+        self.loop.create_task(start_healthcheck_server())
 
     async def on_ready(self):
         logger.info(f'Bot ready, Logged in as {self.user.name}.')
