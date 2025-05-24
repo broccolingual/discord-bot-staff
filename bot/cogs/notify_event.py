@@ -1,6 +1,7 @@
 import datetime
 import logging
 import traceback
+import pytz
 
 import discord
 from discord import app_commands
@@ -9,26 +10,27 @@ from discord.ext import commands
 from utils import blank_interaction
 
 logger = logging.getLogger("discord").getChild("notify_event")
+tz = pytz.timezone("Asia/Tokyo")
 
 
 class EventCommentForm(discord.ui.Modal):
     comment = discord.ui.TextInput(
-        label="Contents", placeholder="I'll be a little late...", style=discord.TextStyle.long)
+        label="内容", placeholder="少し遅れます...", style=discord.TextStyle.long)
 
     def __init__(self, timeout=86400, origInteraction=None):  # timeout - 24h
-        super().__init__(title="Comment", timeout=timeout)
+        super().__init__(title="コメント", timeout=timeout)
         self.origInteraction = origInteraction
 
     async def on_submit(self, interaction: discord.Interaction):
         old_embed = self.origInteraction.message.embeds[0]
         if old_embed.fields[4] is None:
-            old_embed.set_field_at(1, "💬 Comments", "")
+            old_embed.set_field_at(1, "💬 コメント", "")
         old_value = old_embed.fields[4].value
         old_value += f"\nFrom {interaction.user.mention} : **{self.comment}**"
         old_embed.set_field_at(
             4, name=old_embed.fields[4].name, value=old_value)
         await self.origInteraction.message.edit(embeds=[old_embed])
-        await interaction.response.send_message("Your comment has been sent correctly.", ephemeral=True, delete_after=10)
+        await interaction.response.send_message("コメントが正常に送信されました。", ephemeral=True, delete_after=10)
 
     async def on_error(self, interaction: discord.Interaction, e: Exception):
         traceback.print_exception(type(e), e, e.__traceback__)
@@ -47,18 +49,18 @@ class EventView(discord.ui.View):
     async def on_timeout(self):
         await self.disable_all_items()
 
-    @discord.ui.button(label="Join",
+    @discord.ui.button(label="参加",
                        style=discord.ButtonStyle.success,
                        custom_id="join_event_btn")
     async def join(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.event is None:
-            await interaction.response.send_message("Failed to retrieve event.", ephemeral=True, delete_after=10)
+            await interaction.response.send_message("イベントの取得に失敗しました。", ephemeral=True, delete_after=10)
             return
         try:
             joining_user_ids = await self.bot.db.get_joined_user_ids(self.event.id)
 
             if interaction.user.id in joining_user_ids:
-                await interaction.response.send_message("You have already joined.", ephemeral=True, delete_after=10)
+                await interaction.response.send_message("あなたはすでに参加しています。", ephemeral=True, delete_after=10)
                 return
 
             await self.bot.db.add_joined_user(self.event.id, interaction.user.id)
@@ -80,18 +82,18 @@ class EventView(discord.ui.View):
             3, name=old_embed.fields[3].name, value=new_value)
         await interaction.response.edit_message(embed=old_embed)
 
-    @discord.ui.button(label="Decline",
+    @discord.ui.button(label="辞退",
                        style=discord.ButtonStyle.red,
                        custom_id="decline_event_btn")
     async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.event is None:
-            await interaction.response.send_message("Failed to retrieve event.", ephemeral=True, delete_after=10)
+            await interaction.response.send_message("イベントの取得に失敗しました。", ephemeral=True, delete_after=10)
             return
         try:
             joining_user_ids = await self.bot.db.get_joined_user_ids(self.event.id)
 
             if interaction.user.id not in joining_user_ids:
-                await interaction.response.send_message("You are not participating in this event.", ephemeral=True, delete_after=10)
+                await interaction.response.send_message("あなたはこのイベントに参加していません。", ephemeral=True, delete_after=10)
                 return
 
             await self.bot.db.delete_joined_user(self.event.id, interaction.user.id)
@@ -112,7 +114,7 @@ class EventView(discord.ui.View):
             3, name=old_embed.fields[3].name, value=new_value)
         await interaction.response.edit_message(embed=old_embed)
 
-    @discord.ui.button(label="Leave a comment",
+    @discord.ui.button(label="コメントを送信",
                        style=discord.ButtonStyle.blurple,
                        custom_id="comment_event_btn")
     async def comment(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -121,42 +123,42 @@ class EventView(discord.ui.View):
         except Exception:
             await interaction.response.send_message("Oops... An error occurred during processing.", ephemeral=True, delete_after=10)
 
-    @discord.ui.button(label="Start event",
+    @discord.ui.button(label="イベントを開始",
                        style=discord.ButtonStyle.gray,
                        custom_id="start_event_btn")
     async def start(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.event is None:
-            await interaction.response.send_message("Failed to retrieve event.", ephemeral=True, delete_after=10)
+            await interaction.response.send_message("イベントの取得に失敗しました。", ephemeral=True, delete_after=10)
             return
 
         if self.event.creator != interaction.user:
-            await interaction.response.send_message("You are not the creator of this event.", ephemeral=True, delete_after=10)
+            await interaction.response.send_message("あなたはこのイベントの作成者ではありません。", ephemeral=True, delete_after=10)
             return
 
         if self.event.status == discord.EventStatus.scheduled:
             await self.event.start()
-            await interaction.response.send_message("Event has started!", ephemeral=True, delete_after=10)
+            await interaction.response.send_message("イベントが開始されました！", ephemeral=True, delete_after=10)
         elif self.event.status == discord.EventStatus.active or self.event.status == discord.EventStatus.ended:
-            await interaction.response.send_message("This event is already active.", ephemeral=True, delete_after=10)
+            await interaction.response.send_message("このイベントはすでにアクティブです。", ephemeral=True, delete_after=10)
 
-    @discord.ui.button(label="Cancel/End event",
+    @discord.ui.button(label="イベントをキャンセル/終了",
                        style=discord.ButtonStyle.gray,
                        custom_id="cancel_event_btn")
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.event is None:
-            await interaction.response.send_message("Failed to retrieve event.", ephemeral=True, delete_after=10)
+            await interaction.response.send_message("イベントの取得に失敗しました。", ephemeral=True, delete_after=10)
             return
 
         if self.event.creator != interaction.user:
-            await interaction.response.send_message("You are not the creator of this event.", ephemeral=True, delete_after=10)
+            await interaction.response.send_message("あなたはこのイベントの作成者ではありません。", ephemeral=True, delete_after=10)
             return
 
         if self.event.status == discord.EventStatus.active:
             await self.event.end()
-            await interaction.response.send_message("Event was ended correctly.", ephemeral=True, delete_after=10)
+            await interaction.response.send_message("イベントが正常に終了しました。", ephemeral=True, delete_after=10)
         elif self.event.status == discord.EventStatus.scheduled:
             await self.event.cancel()
-            await interaction.response.send_message("Event was canceled correctly.", ephemeral=True, delete_after=10)
+            await interaction.response.send_message("イベントが正常にキャンセルされました。", ephemeral=True, delete_after=10)
 
 
 class EventNotify(commands.Cog):
@@ -165,28 +167,26 @@ class EventNotify(commands.Cog):
 
     @commands.Cog.listener()
     async def on_scheduled_event_create(self, e):
-        logger.info(
-            f"Event was created: {e.guild.name=} - {e.name=} - {e.start_time=}")
-
         # create & send embed
         notify_embed = discord.Embed(
             title=e.name, description=e.description, color=discord.Colour.orange())
         notify_embed.set_author(
-            name="Event (Scheduled)", icon_url=e.guild.icon.url)
-        notify_embed.add_field(name="🕒 Schedule",
-                               value=f"**{e.start_time.astimezone(datetime.timezone(datetime.timedelta(hours=9))).strftime('%Y-%m-%d %H:%M')}~**")
+            name="イベント (Scheduled)", icon_url=e.guild.icon.url)
+        fixed_start_time = e.start_time.astimezone(tz)
+        notify_embed.add_field(name="🕒 日時",
+                               value=f"**{fixed_start_time.strftime('%Y-%m-%d %H:%M')}~**")
         if e.location is not None:
             notify_embed.add_field(
-                name="📍 Location", value=f"**{e.location}**")
+                name="📍 場所", value=f"**{e.location}**")
         else:
             notify_embed.add_field(
-                name="📡 Channel", value=e.channel.mention)
-        notify_embed.add_field(name="🔗 Event link", value=e.url)
-        notify_embed.add_field(name="👥 Applicants",
+                name="📡 チャンネル", value=e.channel.mention)
+        notify_embed.add_field(name="🔗 リンク", value=e.url)
+        notify_embed.add_field(name="👥 参加者",
                                value=f"`1.` {e.creator.mention}")
-        notify_embed.add_field(name="💬 Comments", value="")
+        notify_embed.add_field(name="💬 コメント", value="")
         notify_embed.set_footer(
-            text=f"Event was created by {e.creator.display_name}", icon_url=e.creator.avatar.url)
+            text=f"イベントは {e.creator.display_name} によって作成されました", icon_url=e.creator.avatar.url)
         notify_embed.set_thumbnail(
             url=e.cover_image.url if e.cover_image is not None else e.creator.avatar.url)
         notify_embed.timestamp = datetime.datetime.now()
@@ -207,7 +207,7 @@ class EventNotify(commands.Cog):
         notify_chan = self.bot.get_partial_messageable(channel["channel_id"])
         embed = await notify_chan.send(embeds=[notify_embed], view=notify_view)
 
-        await self.bot.db.add_event(embed.id, e.id, e.creator.id)
+        await self.bot.db.add_event(embed.id, e.id, e.guild.id, e.creator.id, e.name, e.description, fixed_start_time)
         await self.bot.db.add_joined_user(e.id, e.creator.id)
 
     @commands.Cog.listener()
@@ -235,42 +235,41 @@ class EventNotify(commands.Cog):
         if after.status == discord.EventStatus.active:
             new_embed = discord.Embed(
                 title=after.name, description=after.description, color=discord.Colour.brand_green())
-            new_embed.set_author(name="Event (Ongoing)",
+            new_embed.set_author(name="イベント (Ongoing)",
                                  icon_url=after.guild.icon.url)
             logger.info(
                 f"Event was started: {after.guild.name=} - {after.name=} - {after.start_time=}")
         elif after.status == discord.EventStatus.ended or after.status == discord.EventStatus.cancelled:
             new_embed = discord.Embed(
                 title=after.name, description=after.description, color=discord.Colour.brand_red())
-            new_embed.set_author(name="Event (Inactive)",
+            new_embed.set_author(name="イベント (Inactive)",
                                  icon_url=after.guild.icon.url)
             logger.info(
                 f"Event was ended: {after.guild.name=} - {after.name=} - {after.start_time=}")
         else:
             new_embed = discord.Embed(
                 title=after.name, description=after.description, color=discord.Colour.orange())
-            new_embed.set_author(name="Event (Scheduled)",
+            new_embed.set_author(name="イベント (Scheduled)",
                                  icon_url=after.guild.icon.url)
             logger.info(
                 f"Event was updated: {after.guild.name=} - {after.name=} - {after.start_time=}")
 
         new_embed.set_thumbnail(
             url=after.cover_image.url if after.cover_image is not None else after.creator.avatar.url)
-
+        fixed_start_time = after.start_time.astimezone(tz)
         for i, field in enumerate(old_embed.fields):
             if i == 0:  # Schedule
                 new_embed.add_field(
-                    name=field.name, value=f"**{after.start_time.astimezone(datetime.timezone(datetime.timedelta(hours=9))).strftime('%Y-%m-%d %H:%M')}~**")
+                    name=field.name, value=f"**{fixed_start_time.strftime('%Y-%m-%d %H:%M')}~**")
             elif i == 1:  # Location or Channel
                 if after.location is not None:
                     new_embed.add_field(
-                        name="📍 Location", value=f"**{after.location}**")
+                        name="📍 場所", value=f"**{after.location}**")
                 else:
                     new_embed.add_field(
-                        name="📡 Channel", value=after.channel.mention)
+                        name="📡 チャンネル", value=after.channel.mention)
             else:
                 new_embed.add_field(name=field.name, value=field.value)
-
         new_embed.set_footer(text=old_embed.footer.text,
                              icon_url=old_embed.footer.icon_url)
         new_embed.timestamp = old_embed.timestamp
@@ -279,6 +278,8 @@ class EventNotify(commands.Cog):
             await notify_msg.edit(embeds=[new_embed], view=None)
         else:
             await notify_msg.edit(embeds=[new_embed])
+
+        await self.bot.db.update_event(notify_msg.id, after.name, after.description, fixed_start_time)
 
 
 class EventNotifyChannelResistrationView(discord.ui.View):
@@ -295,19 +296,20 @@ class EventNotifyChannelResistrationView(discord.ui.View):
         await self.disable_all_items()
 
     @discord.ui.select(
-        placeholder="Select a channel to notify",
+        placeholder="通知を受け取るチャンネルを選択してください",
         cls=discord.ui.ChannelSelect,
         channel_types=[discord.ChannelType.text]
     )
-    async def select_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
-        self.channel = channel
-        await blank_interaction(interaction)  # 「インタラクションに失敗しました」対策
+    async def select_channel(self, interaction: discord.Interaction, select: discord.ui.ChannelSelect):
+        self.channel = select
+        await interaction.response.edit_message(
+            content=f"チャンネルが選択されました。登録するにはボタンをクリックしてください。")
 
-    @discord.ui.button(label="Register",
+    @discord.ui.button(label="登録",
                        style=discord.ButtonStyle.success)
     async def register(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.channel is None:
-            await interaction.response.send_message("Please select a channel.")
+            await interaction.response.send_message("チャンネルを選択してください。", ephemeral=True, delete_after=10)
             return
 
         try:
@@ -321,7 +323,7 @@ class EventNotifyChannelResistrationView(discord.ui.View):
             try:
                 await self.bot.db.add_event_notify_channel(interaction.guild.id, self.channel.values[0].id)
 
-                await interaction.response.edit_message(content="Notify channel is registered.", view=None)
+                await interaction.response.edit_message(content="通知チャンネルが登録されました。", view=None, delete_after=10)
             except Exception as e:
                 logger.error(
                     f"Failed to add notify channel: {interaction.guild.name=}, {e=}")
@@ -330,7 +332,7 @@ class EventNotifyChannelResistrationView(discord.ui.View):
             try:
                 await self.bot.db.update_event_notify_channel(interaction.guild.id, self.channel.values[0].id)
 
-                await interaction.response.edit_message(content="Notify channel is updated.", view=None)
+                await interaction.response.edit_message(content="通知チャンネルが更新されました。", view=None, delete_after=10)
             except Exception:
                 logger.error(
                     f"Failed to update notify channel: {interaction.guild.name=}")
@@ -344,19 +346,19 @@ class EventNotifyChannelResister(app_commands.Group):
 
     @app_commands.command(
         name="resister",
-        description="Register the channel to notify (only for administrators)",
+        description="通知チャンネルの登録(管理者専用)",
     )
     @app_commands.checks.has_permissions(administrator=True)
     async def register(self, interaction: discord.Interaction):
-        await interaction.response.send_message("Please click the button to register the channel.", view=EventNotifyChannelResistrationView(self.bot), ephemeral=True)
+        await interaction.response.send_message("チャンネルを登録するにはボタンをクリックしてください。", view=EventNotifyChannelResistrationView(self.bot), ephemeral=True)
 
     @register.error
     async def register_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, app_commands.MissingPermissions):
-            await interaction.response.send_message("You don't have permission to use this command.", ephemeral=True, delete_after=10)
+            await interaction.response.send_message("このコマンドを使用する権限がありません。", ephemeral=True, delete_after=10)
 
 
 async def setup(bot):
     await bot.add_cog(EventNotify(bot))
     bot.tree.add_command(EventNotifyChannelResister(
-        bot, name="notify", description="Notify channel registration"))
+        bot, name="notify", description="通知チャンネルの登録"))

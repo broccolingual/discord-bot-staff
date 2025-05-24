@@ -19,8 +19,16 @@ class SupabaseDB():
     async def update_event_notify_channel(self, server_id, channel_id):
         await self.client.table("event_notify_channel").update({"channel_id": channel_id}).eq("server_id", server_id).execute()
 
-    async def add_event(self, msg_id, event_id, author_id):
-        await self.client.table("event_notify").insert({"msg_id": msg_id, "event_id": event_id, "author_id": author_id}).execute()
+    async def add_event(self, msg_id, event_id, server_id, author_id, name, description, start_time):
+        await self.client.table("event_notify").insert({
+            "msg_id": msg_id,
+            "event_id": event_id,
+            "server_id": server_id,
+            "author_id": author_id,
+            "name": name,
+            "description": description,
+            "start_time": start_time.isoformat()
+        }).execute()
 
     async def get_event(self, msg_id):
         result = await self.client.table("event_notify").select("*").eq("msg_id", msg_id).execute()
@@ -30,8 +38,12 @@ class SupabaseDB():
         result = await self.client.table("event_notify").select("*").eq("event_id", event_id).execute()
         return result.data[0] if result.data else None
 
-    async def update_event(self, msg_id, event_id, author_id):
-        await self.client.table("event_notify").update({"event_id": event_id, "author_id": author_id}).eq("msg_id", msg_id).execute()
+    async def update_event(self, msg_id, name, description, start_time):
+        await self.client.table("event_notify").update({
+            "name": name,
+            "description": description,
+            "start_time": start_time.isoformat()
+        }).eq("msg_id", msg_id).execute()
 
     async def add_joined_user(self, event_id, user_id):
         await self.client.table("event_joined_user").insert({"event_id": event_id, "user_id": user_id}).execute()
