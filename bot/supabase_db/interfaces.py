@@ -19,7 +19,7 @@ class SupabaseDB():
     async def update_event_notify_channel(self, server_id, channel_id):
         await self.client.table("event_notify_channel").update({"channel_id": channel_id}).eq("server_id", server_id).execute()
 
-    async def add_event(self, msg_id, event_id, server_id, author_id, name, description, start_time):
+    async def add_event(self, msg_id, event_id, server_id, author_id, name, description, start_time, was_ended=False):
         await self.client.table("event_notify").insert({
             "msg_id": msg_id,
             "event_id": event_id,
@@ -27,12 +27,20 @@ class SupabaseDB():
             "author_id": author_id,
             "name": name,
             "description": description,
-            "start_time": start_time.isoformat()
+            "start_time": start_time.isoformat(),
+            "was_ended": was_ended
         }).execute()
 
     async def get_event(self, msg_id):
         result = await self.client.table("event_notify").select("*").eq("msg_id", msg_id).execute()
         return result.data[0] if result.data else None
+
+    async def get_events_should_have_been_started(self, current_time):
+        result = await self.client.table("event_notify").select("*").lt("start_time", current_time.isoformat()).eq("was_ended", False).execute()
+        return result.data if result.data else None
+
+    async def update_event_status(self, msg_id, was_ended):
+        await self.client.table("event_notify").update({"was_ended": was_ended}).eq("msg_id", msg_id).execute()
 
     async def get_message(self, event_id):
         result = await self.client.table("event_notify").select("*").eq("event_id", event_id).execute()
@@ -45,11 +53,17 @@ class SupabaseDB():
             "start_time": start_time.isoformat()
         }).eq("msg_id", msg_id).execute()
 
+    async def delete_event(self, msg_id):
+        await self.client.table("event_notify").delete().eq("msg_id", msg_id).execute()
+
     async def add_joined_user(self, event_id, user_id):
         await self.client.table("event_joined_user").insert({"event_id": event_id, "user_id": user_id}).execute()
 
     async def delete_joined_user(self, event_id, user_id):
         await self.client.table("event_joined_user").delete().eq("event_id", event_id).eq("user_id", user_id).execute()
+
+    async def delete_all_joined_users(self, event_id):
+        await self.client.table("event_joined_user").delete().eq("event_id", event_id).execute()
 
     async def get_joined_user_ids(self, event_id):
         result = await self.client.table("event_joined_user").select("*").eq("event_id", event_id).execute()
@@ -58,19 +72,37 @@ class SupabaseDB():
             return user_ids
         return []
 
-    async def init_earned_point(self, server_id, user_id):
+    async def init_point(self, server_id, user_id):
         await self.client.table("point_earned").insert({"server_id": server_id, "user_id": user_id}).execute()
 
-    async def update_earned_point(self, server_id, user_id, point):
+    async def update_point(self, server_id, user_id, point):
         await self.client.table("point_earned").update({"point": point}).eq("server_id", server_id).eq("user_id", user_id).execute()
 
-    async def remove_earned_point(self, server_id, user_id):
+    async def remove_point(self, server_id, user_id):
         await self.client.table("point_earned").delete().eq("server_id", server_id).eq("user_id", user_id).execute()
 
-    async def get_earned_point(self, server_id, user_id):
+    async def get_point(self, server_id, user_id):
         result = await self.client.table("point_earned").select("*").eq("server_id", server_id).eq("user_id", user_id).execute()
-        return result.data[0] if result.data else None
+        if result.data is None:
+            await self.init_point(server_id, user_id)
+            return 0
+        return result.data[0]["point"]
 
-    async def get_user_earned_points_on_server(self, server_id, limit=10):
+    async def get_user_points_on_server(self, server_id, limit=10):
         result = await self.client.table("point_earned").select("*").eq("server_id", server_id).order("point", desc=True).limit(limit).execute()
         return result.data if result.data else None
+
+    async def increment_point(self, server_id, user_id, point):
+        current_points = await self.get_point(server_id, user_id)
+        if current_points:
+            await self.update_point(server_id, user_id, current_points + point)
+        else:
+            await self.init_point(server_id, user_id)
+
+    async def decrement_point(self, server_id, user_id, point):
+        current_points = await self.get_point(server_id, user_id)
+        if current_points:
+            new_point = max(0, current_points - point)
+            await self.update_point(server_id, user_id, new_point)
+        else:
+            await self.init_point(server_id, user_id)

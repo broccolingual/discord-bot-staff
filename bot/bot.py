@@ -1,3 +1,5 @@
+import datetime
+import pytz
 import logging
 import os
 
@@ -17,6 +19,8 @@ handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter(
     '%(asctime)s:%(name)s:%(lineno)d:%(levelname)s:%(message)s'))
 logger.addHandler(handler)
+
+tz = pytz.timezone("Asia/Tokyo")
 
 
 class StaffBot(commands.Bot):
@@ -40,6 +44,7 @@ class StaffBot(commands.Bot):
 
     async def on_ready(self):
         logger.info(f'Bot ready, Logged in as {self.user.name}.')
+        self.check_and_start_events.start()
 
         # add View to the bot
         # TODO
@@ -74,6 +79,25 @@ class StaffBot(commands.Bot):
 
     #     if isinstance(error, commands.MissingPermissions):
     #         return
+
+    @tasks.loop(minutes=1)
+    async def check_and_start_events(self):
+        logger.info("Checking for events to start...")
+        now = datetime.datetime.now(tz)
+        events_already_started = await bot.db.get_events_should_have_been_started(current_time=now)
+        if events_already_started:
+            for event_already_started in events_already_started:
+                event_id = event_already_started["event_id"]
+                guild = self.get_guild(event_already_started["server_id"])
+                if guild is None:
+                    continue
+                event = await guild.fetch_scheduled_event(event_id)
+                if event is None:
+                    await self.db.update_event_status(
+                        msg_id=event_already_started["msg_id"], was_ended=True)
+                    continue
+                if event.status == discord.EventStatus.scheduled:
+                    await event.start()
 
 
 bot = StaffBot()

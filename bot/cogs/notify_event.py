@@ -5,9 +5,7 @@ import pytz
 
 import discord
 from discord import app_commands
-from discord.ext import commands
-
-from utils import blank_interaction
+from discord.ext import commands, tasks
 
 logger = logging.getLogger("discord").getChild("notify_event")
 tz = pytz.timezone("Asia/Tokyo")
@@ -159,6 +157,8 @@ class EventView(discord.ui.View):
         elif self.event.status == discord.EventStatus.scheduled:
             await self.event.cancel()
             await interaction.response.send_message("イベントが正常にキャンセルされました。", ephemeral=True, delete_after=10)
+        elif self.event.status == discord.EventStatus.ended or self.event.status == discord.EventStatus.cancelled:
+            await interaction.response.send_message("このイベントはすでに終了しています。", ephemeral=True, delete_after=10)
 
 
 class EventNotify(commands.Cog):
@@ -209,6 +209,7 @@ class EventNotify(commands.Cog):
 
         await self.bot.db.add_event(embed.id, e.id, e.guild.id, e.creator.id, e.name, e.description, fixed_start_time)
         await self.bot.db.add_joined_user(e.id, e.creator.id)
+        await self.bot.db.increment_point(e.guild.id, e.creator.id, 10)
 
     @commands.Cog.listener()
     async def on_scheduled_event_update(self, before, after):
@@ -239,13 +240,23 @@ class EventNotify(commands.Cog):
                                  icon_url=after.guild.icon.url)
             logger.info(
                 f"Event was started: {after.guild.name=} - {after.name=} - {after.start_time=}")
-        elif after.status == discord.EventStatus.ended or after.status == discord.EventStatus.cancelled:
+        elif after.status == discord.EventStatus.ended:
             new_embed = discord.Embed(
                 title=after.name, description=after.description, color=discord.Colour.brand_red())
             new_embed.set_author(name="イベント (Inactive)",
                                  icon_url=after.guild.icon.url)
+            await self.bot.db.update_event_status(
+                msg_id=notify_msg.id, was_ended=True)
             logger.info(
                 f"Event was ended: {after.guild.name=} - {after.name=} - {after.start_time=}")
+        elif after.status == discord.EventStatus.cancelled:
+            await self.bot.db.delete_event(notify_msg.id)
+            await self.bot.db.delete_all_joined_users(after.id)
+            await self.bot.db.decrement_point(after.guild.id, after.creator.id, 10)
+            await notify_msg.delete()
+            logger.info(
+                f"Event was canceled: {after.guild.name=} - {after.name=} - {after.start_time=}")
+            return
         else:
             new_embed = discord.Embed(
                 title=after.name, description=after.description, color=discord.Colour.orange())
@@ -274,12 +285,11 @@ class EventNotify(commands.Cog):
                              icon_url=old_embed.footer.icon_url)
         new_embed.timestamp = old_embed.timestamp
 
-        if after.status == discord.EventStatus.ended or after.status == discord.EventStatus.cancelled:
+        if after.status == discord.EventStatus.ended:
             await notify_msg.edit(embeds=[new_embed], view=None)
         else:
             await notify_msg.edit(embeds=[new_embed])
-
-        await self.bot.db.update_event(notify_msg.id, after.name, after.description, fixed_start_time)
+            await self.bot.db.update_event(notify_msg.id, after.name, after.description, fixed_start_time)
 
 
 class EventNotifyChannelResistrationView(discord.ui.View):
