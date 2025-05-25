@@ -361,7 +361,6 @@ class EventAppCommands(app_commands.Group):
         name="metrics",
         description="イベント履歴などのメトリクスの表示",
     )
-    @app_commands.checks.has_permissions(administrator=True)
     async def metrics(self, interaction: discord.Interaction, scale: str = "day"):
         """
         日，週，月ごとのイベント開催回数の棒グラフを表示
@@ -378,7 +377,7 @@ class EventAppCommands(app_commands.Group):
             await interaction.response.send_message("スケールは `day`, `week`, `month` のいずれかを指定してください。", ephemeral=True, delete_after=10)
             return
 
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
 
         # 開催回数を集計(0の場合はカウント0として扱う)
         # 開催日時をタイムゾーンに合わせて変換
@@ -461,11 +460,6 @@ class EventAppCommands(app_commands.Group):
         embed.set_footer(text=f"スケール: {scale.capitalize()}")
         embed.timestamp = datetime.datetime.now(tz)
         await interaction.followup.send(embed=embed, file=file)
-
-    @metrics.error
-    async def metrics_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
-        if isinstance(error, app_commands.MissingPermissions):
-            await interaction.response.send_message("このコマンドを使用する権限がありません。", ephemeral=True, delete_after=10)
 
 
 class EventNotifyChannelResister(app_commands.Group):
