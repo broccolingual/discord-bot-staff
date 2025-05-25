@@ -105,7 +105,7 @@ bot = StaffBot()
 
 @bot.tree.command(name="ping", description="Check if the bot is alive")
 async def ping(interaction: discord.Interaction):
-    await interaction.response.send_message(f"Pong! ({round(bot.latency * 1000)}ms)")
+    await interaction.response.send_message(f"Pong! ({round(bot.latency * 1000)}ms)", ephemeral=True)
 
 
 @bot.tree.command(name="help", description="Shows help about the bot, a command, or a category")
@@ -122,7 +122,7 @@ async def help(interaction: discord.Interaction):
             embed.add_field(name=command.name, value="\n".join(
                 [f"`{subcommand.name}`: {subcommand.description}" for subcommand in command.children]), inline=False)
 
-    await interaction.response.send_message(embed=embed)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 if __name__ == "__main__":
     bot.run(settings.TOKEN, reconnect=True,

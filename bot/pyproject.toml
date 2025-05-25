@@ -8,6 +8,7 @@ dependencies = [
     "aiohttp>=3.11.18",
     "cryptography>=44.0.2",
     "discord-py>=2.4.0",
+    "matplotlib>=3.10.3",
     "pytz>=2025.2",
     "requests>=2.32.3",
     "supabase>=2.15.1",

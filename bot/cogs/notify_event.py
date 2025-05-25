@@ -5,7 +5,10 @@ import pytz
 
 import discord
 from discord import app_commands
-from discord.ext import commands, tasks
+from discord.ext import commands
+from matplotlib import pyplot as plt
+import matplotlib.ticker as ticker
+import numpy as np
 
 logger = logging.getLogger("discord").getChild("notify_event")
 tz = pytz.timezone("Asia/Tokyo")
@@ -349,6 +352,122 @@ class EventNotifyChannelResistrationView(discord.ui.View):
                 return
 
 
+class EventAppCommands(app_commands.Group):
+    def __init__(self, bot, name, description):
+        super().__init__(name=name, description=description)
+        self.bot = bot
+
+    @app_commands.command(
+        name="metrics",
+        description="イベント履歴などのメトリクスの表示",
+    )
+    @app_commands.checks.has_permissions(administrator=True)
+    async def metrics(self, interaction: discord.Interaction, scale: str = "day"):
+        """
+        日，週，月ごとのイベント開催回数の棒グラフを表示
+        日の場合は過去7日間のイベント開催回数を表示
+        週の場合は過去4週間のイベント開催回数を表示
+        月の場合は過去12ヶ月のイベント開催回数を表示
+        """
+        events = await self.bot.db.get_all_events_held_on_server(interaction.guild.id)
+
+        if not events:
+            await interaction.response.send_message("このサーバではイベントが開催されていません。", ephemeral=True, delete_after=10)
+            return
+        if scale not in ["day", "week", "month"]:
+            await interaction.response.send_message("スケールは `day`, `week`, `month` のいずれかを指定してください。", ephemeral=True, delete_after=10)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+
+        # 開催回数を集計(0の場合はカウント0として扱う)
+        # 開催日時をタイムゾーンに合わせて変換
+        counts = {}
+        now = datetime.datetime.now(tz)
+
+        for event in events:
+            start_time = datetime.datetime.fromisoformat(
+                event["start_time"]).astimezone(tz)
+
+            # 開催日時をカウント
+            if scale == "day":
+                key = start_time.strftime("%Y-%m-%d")
+                if (now - start_time).days < 7:
+                    counts[key] = counts.get(key, 0) + 1
+            elif scale == "week":
+                key = start_time.strftime("%Y-%W")
+                if (now - start_time).days < 28:
+                    counts[key] = counts.get(key, 0) + 1
+            elif scale == "month":
+                key = start_time.strftime("%Y-%m")
+                if (now - start_time).days < 365:
+                    counts[key] = counts.get(key, 0) + 1
+
+        # 開催されていない日付を追加
+        if scale == "day":
+            for i in range(6, -1, -1):
+                d = (now - datetime.timedelta(days=i)).strftime("%Y-%m-%d")
+                if d not in counts:
+                    counts[d] = 0
+        elif scale == "week":
+            for i in range(3, -1, -1):
+                week = (now - datetime.timedelta(weeks=i))
+                w = week.strftime("%Y-%W")
+                if w not in counts:
+                    counts[w] = 0
+        elif scale == "month":
+            for i in range(11, -1, -1):
+                m = (now - datetime.timedelta(days=30*i)).strftime("%Y-%m")
+                if m not in counts:
+                    counts[m] = 0
+
+        if not any(counts.values()):
+            await interaction.followup.send("このサーバでは指定された期間にイベントが開催されていません。", ephemeral=True, delete_after=10)
+            return
+
+        # 日付をソート
+        sorted_counts = dict(sorted(counts.items()))
+
+        # カラーマップで色を生成
+        cmap = plt.get_cmap("Blues")  # お好みで "viridis" や "plasma" なども可
+        values = np.array(list(sorted_counts.values()))
+        norm = plt.Normalize(values.min(), values.max()
+                             if values.max() > 0 else 1)
+        colors = cmap(norm(values))
+
+        # 棒グラフを作成
+        plt.bar(sorted_counts.keys(), sorted_counts.values(), color=colors)
+        plt.xlabel("Date")
+        plt.ylabel("Number of Events")
+        plt.title(
+            f"Number of Events Held in {interaction.guild.name} ({scale.capitalize()})")
+        plt.xticks(rotation=45)
+        plt.gca().yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+        plt.tight_layout()
+
+        # グラフを保存
+        file_path = f"event_metrics_{interaction.guild.id}_{scale}.png"
+        plt.savefig(file_path)
+        plt.close()
+
+        # グラフを画像として，embedに添付
+        file = discord.File(file_path, filename="event_metrics.png")
+        embed = discord.Embed(
+            title=f"{interaction.guild.name}のイベントメトリクス ({scale.capitalize()})",
+            description=f"過去のイベント開催回数を表示しています。",
+            color=discord.Colour.blue()
+        )
+        embed.set_image(url="attachment://event_metrics.png")
+        embed.set_footer(text=f"スケール: {scale.capitalize()}")
+        embed.timestamp = datetime.datetime.now(tz)
+        await interaction.followup.send(embed=embed, file=file)
+
+    @metrics.error
+    async def metrics_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+        if isinstance(error, app_commands.MissingPermissions):
+            await interaction.response.send_message("このコマンドを使用する権限がありません。", ephemeral=True, delete_after=10)
+
+
 class EventNotifyChannelResister(app_commands.Group):
     def __init__(self, bot, name, description):
         super().__init__(name=name, description=description)
@@ -370,5 +489,7 @@ class EventNotifyChannelResister(app_commands.Group):
 
 async def setup(bot):
     await bot.add_cog(EventNotify(bot))
+    bot.tree.add_command(EventAppCommands(
+        bot, name="event", description="イベントに関連するコマンド"))
     bot.tree.add_command(EventNotifyChannelResister(
         bot, name="notify", description="通知チャンネルの登録"))

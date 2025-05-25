@@ -34,6 +34,10 @@ class SupabaseDB():
     async def get_event(self, msg_id):
         result = await self.client.table("event_notify").select("*").eq("msg_id", msg_id).execute()
         return result.data[0] if result.data else None
+    
+    async def get_all_events_held_on_server(self, server_id):
+        result = await self.client.table("event_notify").select("*").eq("server_id", server_id).eq("was_ended", True).execute()
+        return result.data if result.data else None
 
     async def get_events_should_have_been_started(self, current_time):
         result = await self.client.table("event_notify").select("*").lt("start_time", current_time.isoformat()).eq("was_ended", False).execute()
@@ -83,7 +87,7 @@ class SupabaseDB():
 
     async def get_point(self, server_id, user_id):
         result = await self.client.table("point_earned").select("*").eq("server_id", server_id).eq("user_id", user_id).execute()
-        if result.data is None:
+        if result.data is None or len(result.data) == 0:
             await self.init_point(server_id, user_id)
             return 0
         return result.data[0]["point"]
