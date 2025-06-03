@@ -361,7 +361,13 @@ class EventAppCommands(app_commands.Group):
         name="metrics",
         description="イベント履歴などのメトリクスの表示",
     )
-    async def metrics(self, interaction: discord.Interaction, scale: str = "day"):
+    @app_commands.describe(scale="集計期間")
+    @app_commands.choices(scale=[
+        app_commands.Choice(name="Past 7 Days", value="7days"),
+        app_commands.Choice(name="Past 4 Weeks", value="4weeks"),
+        app_commands.Choice(name="Past 12 Months", value="12months"),
+    ])
+    async def metrics(self, interaction: discord.Interaction, scale: app_commands.Choice[str]):
         """
         日，週，月ごとのイベント開催回数の棒グラフを表示
         日の場合は過去7日間のイベント開催回数を表示
@@ -373,8 +379,8 @@ class EventAppCommands(app_commands.Group):
         if not events:
             await interaction.response.send_message("このサーバではイベントが開催されていません。", ephemeral=True, delete_after=10)
             return
-        if scale not in ["day", "week", "month"]:
-            await interaction.response.send_message("スケールは `day`, `week`, `month` のいずれかを指定してください。", ephemeral=True, delete_after=10)
+        if scale not in ["7days", "4weeks", "12months"]:
+            await interaction.response.send_message("スケールは `7days`, `4weeks`, `12months` のいずれかを指定してください。", ephemeral=True, delete_after=10)
             return
 
         await interaction.response.defer()
@@ -389,40 +395,36 @@ class EventAppCommands(app_commands.Group):
                 event["start_time"]).astimezone(tz)
 
             # 開催日時をカウント
-            if scale == "day":
+            if scale == "7days":
                 key = start_time.strftime("%Y-%m-%d")
                 if (now - start_time).days < 7:
                     counts[key] = counts.get(key, 0) + 1
-            elif scale == "week":
+            elif scale == "4weeks":
                 key = start_time.strftime("%Y-%W")
                 if (now - start_time).days < 28:
                     counts[key] = counts.get(key, 0) + 1
-            elif scale == "month":
+            elif scale == "12months":
                 key = start_time.strftime("%Y-%m")
                 if (now - start_time).days < 365:
                     counts[key] = counts.get(key, 0) + 1
 
         # 開催されていない日付を追加
-        if scale == "day":
+        if scale == "7days":
             for i in range(6, -1, -1):
                 d = (now - datetime.timedelta(days=i)).strftime("%Y-%m-%d")
                 if d not in counts:
                     counts[d] = 0
-        elif scale == "week":
+        elif scale == "4weeks":
             for i in range(3, -1, -1):
                 week = (now - datetime.timedelta(weeks=i))
                 w = week.strftime("%Y-%W")
                 if w not in counts:
                     counts[w] = 0
-        elif scale == "month":
+        elif scale == "12months":
             for i in range(11, -1, -1):
                 m = (now - datetime.timedelta(days=30*i)).strftime("%Y-%m")
                 if m not in counts:
                     counts[m] = 0
-
-        if not any(counts.values()):
-            await interaction.followup.send("このサーバでは指定された期間にイベントが開催されていません。", ephemeral=True, delete_after=10)
-            return
 
         # 日付をソート
         sorted_counts = dict(sorted(counts.items()))
