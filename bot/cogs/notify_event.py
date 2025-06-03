@@ -367,7 +367,7 @@ class EventAppCommands(app_commands.Group):
         app_commands.Choice(name="Past 4 Weeks", value="4weeks"),
         app_commands.Choice(name="Past 12 Months", value="12months"),
     ])
-    async def metrics(self, interaction: discord.Interaction, scale: app_commands.Choice[str]):
+    async def metrics(self, interaction: discord.Interaction, scale: str):
         """
         日，週，月ごとのイベント開催回数の棒グラフを表示
         日の場合は過去7日間のイベント開催回数を表示
@@ -430,7 +430,7 @@ class EventAppCommands(app_commands.Group):
         sorted_counts = dict(sorted(counts.items()))
 
         # カラーマップで色を生成
-        cmap = plt.get_cmap("Blues")  # お好みで "viridis" や "plasma" なども可
+        cmap = plt.get_cmap("viridis")  # お好みで "viridis" や "plasma" なども可
         values = np.array(list(sorted_counts.values()))
         norm = plt.Normalize(values.min(), values.max()
                              if values.max() > 0 else 1)
