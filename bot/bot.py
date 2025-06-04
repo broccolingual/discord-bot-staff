@@ -4,11 +4,11 @@ import logging
 import os
 
 import discord
-from discord import app_commands
 from discord.ext import commands, tasks
 
 import settings
 from supabase_db.interfaces import SupabaseDB
+from cogs.notify_event import load_event_view_sessions
 
 # Set up logging
 logger = logging.getLogger("discord")
@@ -42,12 +42,11 @@ class StaffBot(commands.Bot):
 
         await self.db.get_client()
 
+        await load_event_view_sessions(self)
+
     async def on_ready(self):
         logger.info(f'Bot ready, Logged in as {self.user.name}.')
         self.check_and_start_events.start()
-
-        # add View to the bot
-        # TODO
 
     async def on_connect(self):
         logger.info(f'Bot connected. (discord.py: v{discord.__version__})')
@@ -83,20 +82,28 @@ class StaffBot(commands.Bot):
     @tasks.loop(minutes=1)
     async def check_and_start_events(self):
         logger.info("Checking for events to start...")
-        now = datetime.datetime.now(tz)
-        events_already_started = await bot.db.get_events_should_have_been_started(current_time=now)
-        if events_already_started:
-            for event_already_started in events_already_started:
-                event_id = event_already_started["event_id"]
-                guild = self.get_guild(event_already_started["server_id"])
-                if guild is None:
+        events_should_have_been_started = await bot.db.get_events_should_have_been_started(current_time=datetime.datetime.now(tz))
+        if events_should_have_been_started:
+            for event_should_have_been_started in events_should_have_been_started:
+                event_id = event_should_have_been_started["event_id"]
+                try:
+                    guild = await self.fetch_guild(event_should_have_been_started["server_id"])
+                except discord.NotFound:
+                    logger.warning(
+                        f"Guild with ID {event_should_have_been_started['server_id']} not found.")
                     continue
-                event = await guild.fetch_scheduled_event(event_id)
-                if event is None:
+                try:
+                    event = await guild.fetch_scheduled_event(event_id)
+                except discord.NotFound:
+                    logger.warning(
+                        f"Event with ID {event_id} not found in guild {guild.name}.")
+                    continue
+
+                if event.status == discord.EventStatus.completed:
                     await self.db.update_event_status(
-                        msg_id=event_already_started["msg_id"], was_ended=True)
+                        msg_id=event_should_have_been_started["msg_id"], was_ended=True)
                     continue
-                if event.status == discord.EventStatus.scheduled:
+                elif event.status == discord.EventStatus.scheduled:
                     await event.start()
 
 

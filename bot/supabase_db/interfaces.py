@@ -19,7 +19,7 @@ class SupabaseDB():
     async def update_event_notify_channel(self, server_id, channel_id):
         await self.client.table("event_notify_channel").update({"channel_id": channel_id}).eq("server_id", server_id).execute()
 
-    async def add_event(self, msg_id, event_id, server_id, author_id, name, description, start_time, was_ended=False):
+    async def add_event(self, msg_id, event_id, server_id, author_id, name, description, start_time, view_name, was_ended=False):
         await self.client.table("event_notify").insert({
             "msg_id": msg_id,
             "event_id": event_id,
@@ -28,19 +28,24 @@ class SupabaseDB():
             "name": name,
             "description": description,
             "start_time": start_time.isoformat(),
-            "was_ended": was_ended
+            "was_ended": was_ended,
+            "view_name": view_name
         }).execute()
 
     async def get_event(self, msg_id):
         result = await self.client.table("event_notify").select("*").eq("msg_id", msg_id).execute()
         return result.data[0] if result.data else None
-    
+
     async def get_all_events_held_on_server(self, server_id):
         result = await self.client.table("event_notify").select("*").eq("server_id", server_id).eq("was_ended", True).execute()
         return result.data if result.data else None
 
     async def get_events_should_have_been_started(self, current_time):
         result = await self.client.table("event_notify").select("*").lt("start_time", current_time.isoformat()).eq("was_ended", False).execute()
+        return result.data if result.data else None
+
+    async def get_active_event_sessions(self, current_time):
+        result = await self.client.table("event_notify").select("*").gt("start_time", current_time.isoformat()).eq("was_ended", False).execute()
         return result.data if result.data else None
 
     async def update_event_status(self, msg_id, was_ended):

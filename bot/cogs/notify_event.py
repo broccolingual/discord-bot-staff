@@ -16,21 +16,23 @@ tz = pytz.timezone("Asia/Tokyo")
 
 class EventCommentForm(discord.ui.Modal):
     comment = discord.ui.TextInput(
-        label="内容", placeholder="少し遅れます...", style=discord.TextStyle.long)
+        label="Content", placeholder="Enter your comment...", style=discord.TextStyle.long)
 
-    def __init__(self, timeout=86400, origInteraction=None):  # timeout - 24h
-        super().__init__(title="コメント", timeout=timeout)
+    def __init__(self, timeout=600, origInteraction=None):  # timeout - 10min
+        super().__init__(title="Leave a comment", timeout=timeout)
         self.origInteraction = origInteraction
 
     async def on_submit(self, interaction: discord.Interaction):
-        old_embed = self.origInteraction.message.embeds[0]
-        if old_embed.fields[4] is None:
-            old_embed.set_field_at(1, "💬 コメント", "")
-        old_value = old_embed.fields[4].value
-        old_value += f"\nFrom {interaction.user.mention} : **{self.comment}**"
-        old_embed.set_field_at(
-            4, name=old_embed.fields[4].name, value=old_value)
-        await self.origInteraction.message.edit(embeds=[old_embed])
+        comment_embed = discord.Embed(
+            description=self.comment,
+            color=discord.Colour.blue(),
+            timestamp=datetime.datetime.now(tz)
+        )
+        comment_embed.set_footer(
+            text=f"{interaction.user.display_name}",
+            icon_url=interaction.user.avatar.url if interaction.user.avatar else interaction.user.default_avatar.url
+        )
+        await self.origInteraction.message.edit(embeds=[*self.origInteraction.message.embeds, comment_embed])
         await interaction.response.send_message("コメントが正常に送信されました。", ephemeral=True, delete_after=10)
 
     async def on_error(self, interaction: discord.Interaction, e: Exception):
@@ -38,17 +40,10 @@ class EventCommentForm(discord.ui.Modal):
 
 
 class EventView(discord.ui.View):
-    def __init__(self, bot, event: discord.ScheduledEvent, timeout=86400):  # timeout - 24h
+    def __init__(self, bot, event: discord.ScheduledEvent, timeout=None):  # Persistent View
         super().__init__(timeout=timeout)
         self.bot = bot
         self.event = event
-
-    async def disable_all_items(self):
-        for item in self.children:
-            item.disable = True
-
-    async def on_timeout(self):
-        await self.disable_all_items()
 
     @discord.ui.button(label="参加",
                        style=discord.ButtonStyle.success,
@@ -80,8 +75,8 @@ class EventView(discord.ui.View):
             if user is not None:
                 new_value += f"`{i+1}.` {user.mention}\n"
         old_embed.set_field_at(
-            3, name=old_embed.fields[3].name, value=new_value)
-        await interaction.response.edit_message(embed=old_embed)
+            2, name=old_embed.fields[2].name, value=new_value)
+        await interaction.response.edit_message(embeds=[old_embed, *interaction.message.embeds[1:]])
 
     @discord.ui.button(label="辞退",
                        style=discord.ButtonStyle.red,
@@ -112,8 +107,8 @@ class EventView(discord.ui.View):
             if user is not None:
                 new_value += f"`{i+1}.` {user.mention}\n"
         old_embed.set_field_at(
-            3, name=old_embed.fields[3].name, value=new_value)
-        await interaction.response.edit_message(embed=old_embed)
+            2, name=old_embed.fields[2].name, value=new_value)
+        await interaction.response.edit_message(embeds=[old_embed, *interaction.message.embeds[1:]])
 
     @discord.ui.button(label="コメントを送信",
                        style=discord.ButtonStyle.blurple,
@@ -163,6 +158,41 @@ class EventView(discord.ui.View):
         elif self.event.status == discord.EventStatus.ended or self.event.status == discord.EventStatus.cancelled:
             await interaction.response.send_message("このイベントはすでに終了しています。", ephemeral=True, delete_after=10)
 
+    @classmethod
+    async def from_session_record(cls, bot, record: dict):
+        guild_id = record.get("server_id")
+        event_id = record.get("event_id")
+        try:
+            guild = await bot.fetch_guild(guild_id)
+        except discord.NotFound:
+            logger.warning(f"Guild with ID {guild_id} not found.")
+            return None
+        try:
+            event = await guild.fetch_scheduled_event(event_id)
+        except discord.NotFound:
+            logger.warning(
+                f"Event with ID {event_id} not found in guild {guild.name}.")
+            return None
+        return cls(bot, event)
+
+
+async def load_event_view_sessions(bot):
+    """
+    Load all event view sessions from the database.
+    """
+    sessions = await bot.db.get_active_event_sessions(
+        current_time=datetime.datetime.now(tz))
+    if sessions is None:
+        logger.info("No event view sessions found in the database.")
+        return
+
+    for session in sessions:
+        view = await EventView.from_session_record(bot, session)
+        if view is not None:
+            bot.add_view(view)  # Recreate the view with the bot and event
+    logger.info(
+        f"Loaded {len(sessions)} event view sessions from the database.")
+
 
 class EventNotify(commands.Cog):
     def __init__(self, bot):
@@ -174,26 +204,24 @@ class EventNotify(commands.Cog):
         notify_embed = discord.Embed(
             title=e.name, description=e.description, color=discord.Colour.orange())
         notify_embed.set_author(
-            name="イベント (Scheduled)", icon_url=e.guild.icon.url)
+            name="Scheduled Event", icon_url=e.guild.icon.url)
         fixed_start_time = e.start_time.astimezone(tz)
-        notify_embed.add_field(name="🕒 日時",
+        notify_embed.add_field(name="🕒 Date",
                                value=f"**{fixed_start_time.strftime('%Y-%m-%d %H:%M')}~**")
         if e.location is not None:
             notify_embed.add_field(
-                name="📍 場所", value=f"**{e.location}**")
+                name="📍 Location", value=f"**{e.location}**")
         else:
             notify_embed.add_field(
-                name="📡 チャンネル", value=e.channel.mention)
-        notify_embed.add_field(name="🔗 リンク", value=e.url)
-        notify_embed.add_field(name="👥 参加者",
+                name="📡 Channel", value=e.channel.mention)
+        notify_embed.add_field(name="👥 Participants",
                                value=f"`1.` {e.creator.mention}")
-        notify_embed.add_field(name="💬 コメント", value="")
         notify_embed.set_footer(
-            text=f"イベントは {e.creator.display_name} によって作成されました", icon_url=e.creator.avatar.url)
+            text=f"Created by {e.creator.display_name}", icon_url=e.creator.avatar.url)
         notify_embed.set_thumbnail(
-            url=e.cover_image.url if e.cover_image is not None else e.creator.avatar.url)
+            url=e.cover_image.url if e.cover_image is not None else e.guild.icon.url)
         notify_embed.timestamp = datetime.datetime.now()
-        notify_view = EventView(self.bot, e, timeout=86400)  # timeout - 24h
+        notify_view = EventView(self.bot, e)
 
         try:
             channel = await self.bot.db.get_event_notify_channel(e.guild.id)
@@ -210,7 +238,7 @@ class EventNotify(commands.Cog):
         notify_chan = self.bot.get_partial_messageable(channel["channel_id"])
         embed = await notify_chan.send(embeds=[notify_embed], view=notify_view)
 
-        await self.bot.db.add_event(embed.id, e.id, e.guild.id, e.creator.id, e.name, e.description, fixed_start_time)
+        await self.bot.db.add_event(embed.id, e.id, e.guild.id, e.creator.id, e.name, e.description, fixed_start_time, notify_view.__class__.__name__, was_ended=False)
         await self.bot.db.add_joined_user(e.id, e.creator.id)
         await self.bot.db.increment_point(e.guild.id, e.creator.id, 10)
 
@@ -239,14 +267,14 @@ class EventNotify(commands.Cog):
         if after.status == discord.EventStatus.active:
             new_embed = discord.Embed(
                 title=after.name, description=after.description, color=discord.Colour.brand_green())
-            new_embed.set_author(name="イベント (Ongoing)",
+            new_embed.set_author(name="Ongoing Event",
                                  icon_url=after.guild.icon.url)
             logger.info(
                 f"Event was started: {after.guild.name=} - {after.name=} - {after.start_time=}")
         elif after.status == discord.EventStatus.ended:
             new_embed = discord.Embed(
                 title=after.name, description=after.description, color=discord.Colour.brand_red())
-            new_embed.set_author(name="イベント (Inactive)",
+            new_embed.set_author(name="Finished Event",
                                  icon_url=after.guild.icon.url)
             await self.bot.db.update_event_status(
                 msg_id=notify_msg.id, was_ended=True)
@@ -263,13 +291,13 @@ class EventNotify(commands.Cog):
         else:
             new_embed = discord.Embed(
                 title=after.name, description=after.description, color=discord.Colour.orange())
-            new_embed.set_author(name="イベント (Scheduled)",
+            new_embed.set_author(name="Scheduled Event",
                                  icon_url=after.guild.icon.url)
             logger.info(
                 f"Event was updated: {after.guild.name=} - {after.name=} - {after.start_time=}")
 
         new_embed.set_thumbnail(
-            url=after.cover_image.url if after.cover_image is not None else after.creator.avatar.url)
+            url=after.cover_image.url if after.cover_image is not None else after.guild.icon.url)
         fixed_start_time = after.start_time.astimezone(tz)
         for i, field in enumerate(old_embed.fields):
             if i == 0:  # Schedule
@@ -278,10 +306,10 @@ class EventNotify(commands.Cog):
             elif i == 1:  # Location or Channel
                 if after.location is not None:
                     new_embed.add_field(
-                        name="📍 場所", value=f"**{after.location}**")
+                        name="📍 Location", value=f"**{after.location}**")
                 else:
                     new_embed.add_field(
-                        name="📡 チャンネル", value=after.channel.mention)
+                        name="📡 Channel", value=after.channel.mention)
             else:
                 new_embed.add_field(name=field.name, value=field.value)
         new_embed.set_footer(text=old_embed.footer.text,
@@ -289,9 +317,9 @@ class EventNotify(commands.Cog):
         new_embed.timestamp = old_embed.timestamp
 
         if after.status == discord.EventStatus.ended:
-            await notify_msg.edit(embeds=[new_embed], view=None)
+            await notify_msg.edit(embeds=[new_embed, *notify_msg.embeds[1:]], view=None)
         else:
-            await notify_msg.edit(embeds=[new_embed])
+            await notify_msg.edit(embeds=[new_embed, *notify_msg.embeds[1:]])
             await self.bot.db.update_event(notify_msg.id, after.name, after.description, fixed_start_time)
 
 
