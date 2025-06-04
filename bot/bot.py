@@ -89,6 +89,8 @@ class StaffBot(commands.Bot):
                 try:
                     guild = await self.fetch_guild(event_should_have_been_started["server_id"])
                 except discord.NotFound:
+                    await self.db.update_event_status(
+                        msg_id=event_should_have_been_started["msg_id"], was_ended=True)
                     logger.warning(
                         f"Guild with ID {event_should_have_been_started['server_id']} not found.")
                     continue
