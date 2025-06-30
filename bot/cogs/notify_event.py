@@ -29,7 +29,7 @@ class EventCommentForm(discord.ui.Modal):
             timestamp=datetime.datetime.now(tz)
         )
         comment_embed.set_footer(
-            text=f"{interaction.user.display_name}",
+            text=interaction.user.display_name,
             icon_url=interaction.user.avatar.url if interaction.user.avatar else interaction.user.default_avatar.url
         )
         await self.origInteraction.message.edit(embeds=[*self.origInteraction.message.embeds, comment_embed])
@@ -217,7 +217,7 @@ class EventNotify(commands.Cog):
         notify_embed.add_field(name="👥 Participants",
                                value=f"`1.` {e.creator.mention}")
         notify_embed.set_footer(
-            text=f"Created by {e.creator.display_name}", icon_url=e.creator.avatar.url)
+            text=e.creator.display_name, icon_url=e.creator.avatar.url)
         notify_embed.set_thumbnail(
             url=e.cover_image.url if e.cover_image is not None else e.guild.icon.url)
         notify_embed.timestamp = datetime.datetime.now()
@@ -328,13 +328,6 @@ class EventNotifyChannelResistrationView(discord.ui.View):
         super().__init__(timeout=timeout)
         self.bot = bot
         self.channel = None
-
-    async def disable_all_items(self):
-        for item in self.children:
-            item.disable = True
-
-    async def on_timeout(self):
-        await self.disable_all_items()
 
     @discord.ui.select(
         placeholder="通知を受け取るチャンネルを選択してください",
