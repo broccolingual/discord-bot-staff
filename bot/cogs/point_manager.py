@@ -7,6 +7,12 @@ from discord.ext import commands
 
 logger = logging.getLogger("discord").getChild("point_manager")
 
+ON_MESSAGE_POINT = 2
+ON_INVITE_CREATE_POINT = 5
+ON_REACTION_ADD_POINT = 1
+ON_THREAD_CREATE_POINT = 3
+ON_VOICE_CHANNEL_LEAVE_POINT = 3
+
 
 class Point(app_commands.Group):
     def __init__(self, bot, name, description):
@@ -25,6 +31,7 @@ class Point(app_commands.Group):
             await interaction.response.send_message(f"{user.mention}のポイントは`{interaction.guild.name}`で**{point}**です。", ephemeral=True, delete_after=10)
         except Exception as e:
             await interaction.response.send_message("Oops... An error occurred while fetching the points.", ephemeral=True, delete_after=10)
+            traceback.print_exception(type(e), e, e.__traceback__)
 
     @app_commands.command(
         name="ranking",
@@ -84,13 +91,13 @@ class PointListener(commands.Cog):
     async def on_message(self, message):
         if message.author.bot:
             return
-        await self.bot.db.increment_point(message.guild.id, message.author.id, 2)
+        await self.bot.db.increment_point(message.guild.id, message.author.id, ON_MESSAGE_POINT)
 
     @commands.Cog.listener()
     async def on_invite_create(self, invite):
         if invite.inviter.bot:
             return
-        await self.bot.db.increment_point(invite.guild.id, invite.inviter.id, 5)
+        await self.bot.db.increment_point(invite.guild.id, invite.inviter.id, ON_INVITE_CREATE_POINT)
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
@@ -102,19 +109,19 @@ class PointListener(commands.Cog):
         user = guild.get_member(payload.user_id)
         if user is None or user.bot:
             return
-        await self.bot.db.increment_point(payload.guild_id, payload.user_id, 1)
+        await self.bot.db.increment_point(payload.guild_id, payload.user_id, ON_REACTION_ADD_POINT)
 
     @commands.Cog.listener()
     async def on_thread_create(self, thread):
         if thread.owner.bot:
             return
-        await self.bot.db.increment_point(thread.guild.id, thread.owner.id, 5)
+        await self.bot.db.increment_point(thread.guild.id, thread.owner.id, ON_THREAD_CREATE_POINT)
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
         if member.bot or after.channel is not None:
             return
-        await self.bot.db.increment_point(member.guild.id, member.id, 5)
+        await self.bot.db.increment_point(member.guild.id, member.id, ON_VOICE_CHANNEL_LEAVE_POINT)
 
 
 async def setup(bot):
