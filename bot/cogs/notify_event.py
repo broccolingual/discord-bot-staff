@@ -16,15 +16,15 @@ tz = pytz.timezone("Asia/Tokyo")
 
 class EventCommentForm(discord.ui.Modal):
     comment = discord.ui.TextInput(
-        label="Content", placeholder="Enter your comment...", style=discord.TextStyle.long)
+        label="コメント", placeholder="コメントを入力...", style=discord.TextStyle.long)
 
     def __init__(self, timeout=600, origInteraction=None):  # timeout - 10min
-        super().__init__(title="Leave a comment", timeout=timeout)
+        super().__init__(title="💬 コメントを残す", timeout=timeout)
         self.origInteraction = origInteraction
 
     async def on_submit(self, interaction: discord.Interaction):
         comment_embed = discord.Embed(
-            description=self.comment,
+            description=f"> {self.comment.value}",
             color=discord.Colour.blue(),
             timestamp=datetime.datetime.now(tz)
         )
@@ -45,7 +45,7 @@ class EventView(discord.ui.View):
         self.bot = bot
         self.event = event
 
-    @discord.ui.button(label="参加",
+    @discord.ui.button(label="✋参加",
                        style=discord.ButtonStyle.success,
                        custom_id="join_event_btn")
     async def join(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -60,10 +60,9 @@ class EventView(discord.ui.View):
                 return
 
             await self.bot.db.add_joined_user(self.event.id, interaction.user.id)
-
             joining_user_ids.append(interaction.user.id)
         except Exception as e:
-            await interaction.response.send_message("Oops... An error occurred during processing.", ephemeral=True, delete_after=10)
+            await interaction.response.send_message("イベントの参加処理に失敗しました。", ephemeral=True, delete_after=10)
             traceback.print_exception(type(e), e, e.__traceback__)
             return
 
@@ -78,7 +77,7 @@ class EventView(discord.ui.View):
             2, name=old_embed.fields[2].name, value=new_value)
         await interaction.response.edit_message(embeds=[old_embed, *interaction.message.embeds[1:]])
 
-    @discord.ui.button(label="辞退",
+    @discord.ui.button(label="❌辞退",
                        style=discord.ButtonStyle.red,
                        custom_id="decline_event_btn")
     async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -93,10 +92,9 @@ class EventView(discord.ui.View):
                 return
 
             await self.bot.db.delete_joined_user(self.event.id, interaction.user.id)
-
             joining_user_ids.remove(interaction.user.id)
         except Exception as e:
-            await interaction.response.send_message("Oops... An error occurred during processing.", ephemeral=True, delete_after=10)
+            await interaction.response.send_message("イベントの辞退処理に失敗しました。", ephemeral=True, delete_after=10)
             return
 
         # update embed
@@ -110,16 +108,16 @@ class EventView(discord.ui.View):
             2, name=old_embed.fields[2].name, value=new_value)
         await interaction.response.edit_message(embeds=[old_embed, *interaction.message.embeds[1:]])
 
-    @discord.ui.button(label="コメントを送信",
+    @discord.ui.button(label="💬コメントを送信",
                        style=discord.ButtonStyle.blurple,
                        custom_id="comment_event_btn")
     async def comment(self, interaction: discord.Interaction, button: discord.ui.Button):
         try:
             await interaction.response.send_modal(EventCommentForm(timeout=600, origInteraction=interaction))
         except Exception:
-            await interaction.response.send_message("Oops... An error occurred during processing.", ephemeral=True, delete_after=10)
+            await interaction.response.send_message("コメントの送信に失敗しました。", ephemeral=True, delete_after=10)
 
-    @discord.ui.button(label="イベントを開始",
+    @discord.ui.button(label="▶️イベントを開始",
                        style=discord.ButtonStyle.gray,
                        custom_id="start_event_btn")
     async def start(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -137,7 +135,7 @@ class EventView(discord.ui.View):
         elif self.event.status == discord.EventStatus.active or self.event.status == discord.EventStatus.ended:
             await interaction.response.send_message("このイベントはすでにアクティブです。", ephemeral=True, delete_after=10)
 
-    @discord.ui.button(label="イベントをキャンセル/終了",
+    @discord.ui.button(label="❌イベントをキャンセル/終了",
                        style=discord.ButtonStyle.gray,
                        custom_id="cancel_event_btn")
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -204,17 +202,17 @@ class EventNotify(commands.Cog):
         notify_embed = discord.Embed(
             title=e.name, description=e.description, color=discord.Colour.orange())
         notify_embed.set_author(
-            name="Scheduled Event", icon_url=e.guild.icon.url)
+            name="🗓️ 開催予定のイベント", icon_url=e.guild.icon.url)
         fixed_start_time = e.start_time.astimezone(tz)
-        notify_embed.add_field(name="🕒 Date",
+        notify_embed.add_field(name="🕒 開催日時",
                                value=f"**{fixed_start_time.strftime('%Y-%m-%d %H:%M')}~**")
         if e.location is not None:
             notify_embed.add_field(
-                name="📍 Location", value=f"**{e.location}**")
+                name="📍 開催場所", value=f"**{e.location}**")
         else:
             notify_embed.add_field(
-                name="📡 Channel", value=e.channel.mention)
-        notify_embed.add_field(name="👥 Participants",
+                name="📡 開催チャンネル", value=e.channel.mention)
+        notify_embed.add_field(name="👥 参加者",
                                value=f"`1.` {e.creator.mention}")
         notify_embed.set_footer(
             text=e.creator.display_name, icon_url=e.creator.avatar.url)
@@ -267,14 +265,14 @@ class EventNotify(commands.Cog):
         if after.status == discord.EventStatus.active:
             new_embed = discord.Embed(
                 title=after.name, description=after.description, color=discord.Colour.brand_green())
-            new_embed.set_author(name="Ongoing Event",
+            new_embed.set_author(name="🎉 開催中のイベント",
                                  icon_url=after.guild.icon.url)
             logger.info(
                 f"Event was started: {after.guild.name=} - {after.name=} - {after.start_time=}")
         elif after.status == discord.EventStatus.ended:
             new_embed = discord.Embed(
                 title=after.name, description=after.description, color=discord.Colour.brand_red())
-            new_embed.set_author(name="Finished Event",
+            new_embed.set_author(name="🏁 終了したイベント",
                                  icon_url=after.guild.icon.url)
             await self.bot.db.update_event_status(
                 msg_id=notify_msg.id, was_ended=True)
@@ -291,7 +289,7 @@ class EventNotify(commands.Cog):
         else:
             new_embed = discord.Embed(
                 title=after.name, description=after.description, color=discord.Colour.orange())
-            new_embed.set_author(name="Scheduled Event",
+            new_embed.set_author(name="🗓️ 開催予定のイベント",
                                  icon_url=after.guild.icon.url)
             logger.info(
                 f"Event was updated: {after.guild.name=} - {after.name=} - {after.start_time=}")
@@ -306,10 +304,10 @@ class EventNotify(commands.Cog):
             elif i == 1:  # Location or Channel
                 if after.location is not None:
                     new_embed.add_field(
-                        name="📍 Location", value=f"**{after.location}**")
+                        name="📍 開催場所", value=f"**{after.location}**")
                 else:
                     new_embed.add_field(
-                        name="📡 Channel", value=after.channel.mention)
+                        name="📡 開催チャンネル", value=after.channel.mention)
             else:
                 new_embed.add_field(name=field.name, value=field.value)
         new_embed.set_footer(text=old_embed.footer.text,
@@ -461,8 +459,6 @@ class EventAppCommands(app_commands.Group):
         plt.bar(sorted_counts.keys(), sorted_counts.values(), color=colors)
         plt.xlabel("Date")
         plt.ylabel("Number of Events")
-        plt.title(
-            f"Number of Events Held in {interaction.guild.name} ({scale.capitalize()})")
         plt.xticks(rotation=45)
         plt.gca().yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
         plt.tight_layout()
