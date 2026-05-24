@@ -8,7 +8,7 @@ from discord.ext import commands, tasks
 
 import settings
 from supabase_db.interfaces import SupabaseDB
-from cogs.notify_event import load_event_view_sessions
+from cogs.notify_event import reregister_event_views
 
 # Set up logging
 logger = logging.getLogger("discord")
@@ -41,8 +41,7 @@ class StaffBot(commands.Bot):
         logger.info(f"Synced {len(synced_commands)} commands")
 
         await self.db.get_client()
-
-        await load_event_view_sessions(self)
+        await reregister_event_views(self)
 
     async def on_ready(self):
         logger.info(f'Bot ready, Logged in as {self.user.name}.')

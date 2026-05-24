@@ -14,147 +14,141 @@ logger = logging.getLogger("discord").getChild("notify_event")
 tz = pytz.timezone("Asia/Tokyo")
 
 
-class EventCommentForm(discord.ui.Modal):
-    comment = discord.ui.TextInput(
-        label="コメント", placeholder="コメントを入力...", style=discord.TextStyle.long)
-
-    def __init__(self, timeout=600, origInteraction=None):  # timeout - 10min
-        super().__init__(title="💬 コメントを残す", timeout=timeout)
-        self.origInteraction = origInteraction
-
-    async def on_submit(self, interaction: discord.Interaction):
-        comment_embed = discord.Embed(
-            description=f"> {self.comment.value}",
-            color=discord.Colour.blue(),
-            timestamp=datetime.datetime.now(tz)
-        )
-        comment_embed.set_footer(
-            text=interaction.user.display_name,
-            icon_url=interaction.user.avatar.url if interaction.user.avatar else interaction.user.default_avatar.url
-        )
-        await self.origInteraction.message.edit(embeds=[*self.origInteraction.message.embeds, comment_embed])
-        await interaction.response.send_message("コメントが正常に送信されました。", ephemeral=True, delete_after=10)
-
-    async def on_error(self, interaction: discord.Interaction, e: Exception):
-        traceback.print_exception(type(e), e, e.__traceback__)
-
-
-class EventView(discord.ui.View):
-    def __init__(self, bot, event: discord.ScheduledEvent, timeout=None):  # Persistent View
-        super().__init__(timeout=timeout)
+class EventNotificationLayoutView(discord.ui.LayoutView):
+    def __init__(self, bot, event: discord.ScheduledEvent):
+        super().__init__(timeout=None)
         self.bot = bot
         self.event = event
 
-    @discord.ui.button(label="✋参加",
-                       style=discord.ButtonStyle.success,
-                       custom_id="join_event_btn")
-    async def join(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if self.event is None:
-            await interaction.response.send_message("イベントの取得に失敗しました。", ephemeral=True, delete_after=10)
-            return
+        fixed_start_time = self.event.start_time.astimezone(tz)
+
+        section = discord.ui.Section(
+            discord.ui.TextDisplay(
+                content=f"🕒 **{fixed_start_time.strftime('%Y-%m-%d %H:%M')}~**"),
+            accessory=discord.ui.Thumbnail(
+                self.event.cover_image.url if self.event.cover_image is not None else self.event.creator.avatar.url if self.event.creator.avatar else self.event.creator.default_avatar.url)
+        )
+        section.add_item(discord.ui.TextDisplay(
+            content=f"## [{self.event.name}]({self.event.url})"))
+        section.add_item(discord.ui.TextDisplay(
+            content=f"> {self.event.description}" if self.event.description else f"> 説明なし"))
+
+        if self.event.status == discord.EventStatus.active:
+            accent_color = discord.Colour.brand_green()
+            status_msg = "開催中"
+        elif self.event.status == discord.EventStatus.ended:
+            accent_color = discord.Colour.brand_red()
+            status_msg = "終了"
+        elif self.event.status == discord.EventStatus.cancelled:
+            accent_color = discord.Colour.dark_gray()
+            status_msg = "キャンセル"
+        else:
+            accent_color = discord.Colour.orange()
+            status_msg = "開催予定"
+
+        container = discord.ui.Container(accent_color=accent_color)
+        container.add_item(section)
+        if self.event.location is not None:
+            container.add_item(discord.ui.TextDisplay(
+                content=f"📍 {self.event.location}"))
+        else:
+            container.add_item(discord.ui.TextDisplay(
+                content=f"📡 <#{self.event.channel_id}>"))
+        self.text_participants = discord.ui.TextDisplay(
+            content=f"👥 <@{self.event.creator.id}>")
+        container.add_item(self.text_participants)
+
+        if self.event.status != discord.EventStatus.ended and self.event.status != discord.EventStatus.cancelled:
+            self.btn_join = discord.ui.Button(
+                label="✋参加", style=discord.ButtonStyle.success, custom_id="btn_join_event")
+            self.btn_decline = discord.ui.Button(
+                label="❌辞退", style=discord.ButtonStyle.red, custom_id="btn_decline_event")
+            self.btn_start = discord.ui.Button(
+                label="▶️イベントを開始", style=discord.ButtonStyle.gray, custom_id="btn_start_event")
+            self.btn_cancel = discord.ui.Button(
+                label="❌イベントをキャンセル/終了", style=discord.ButtonStyle.gray, custom_id="btn_cancel_event")
+
+            self.btn_join.callback = self._on_join_button_pressed
+            self.btn_decline.callback = self._on_decline_button_pressed
+            self.btn_start.callback = self._on_start_button_pressed
+            self.btn_cancel.callback = self._on_cancel_button_pressed
+
+            action_row = discord.ui.ActionRow()
+            action_row.add_item(self.btn_join)
+            action_row.add_item(self.btn_decline)
+            action_row.add_item(self.btn_start)
+            action_row.add_item(self.btn_cancel)
+
+            container.add_item(action_row)
+
+        container.add_item(discord.ui.Separator())
+        container.add_item(discord.ui.TextDisplay(
+            content=f"> 作成者: {self.event.creator.mention} | ステータス: {status_msg}"))
+
+        self.add_item(container)
+
+    async def _on_join_button_pressed(self, itr: discord.Interaction):
         try:
             joining_user_ids = await self.bot.db.get_joined_user_ids(self.event.id)
 
-            if interaction.user.id in joining_user_ids:
-                await interaction.response.send_message("あなたはすでに参加しています。", ephemeral=True, delete_after=10)
+            if itr.user.id in joining_user_ids:
+                await itr.response.send_message("あなたはすでに参加しています。", ephemeral=True, delete_after=10)
                 return
 
-            await self.bot.db.add_joined_user(self.event.id, interaction.user.id)
-            joining_user_ids.append(interaction.user.id)
+            await self.bot.db.add_joined_user(self.event.id, itr.user.id)
+            joining_user_ids.append(itr.user.id)
         except Exception as e:
-            await interaction.response.send_message("イベントの参加処理に失敗しました。", ephemeral=True, delete_after=10)
-            traceback.print_exception(type(e), e, e.__traceback__)
+            await itr.response.send_message("イベントの参加処理に失敗しました。", ephemeral=True, delete_after=10)
             return
 
-        # update embed
-        old_embed = interaction.message.embeds[0]  # get old embed
-        new_value = ""
-        for i, joining_user_id in enumerate(joining_user_ids):
-            user = self.bot.get_user(joining_user_id)
-            if user is not None:
-                new_value += f"`{i+1}.` {user.mention}\n"
-        old_embed.set_field_at(
-            2, name=old_embed.fields[2].name, value=new_value)
-        await interaction.response.edit_message(embeds=[old_embed, *interaction.message.embeds[1:]])
+        self.text_participants.content = "👥 " + \
+            ", ".join([f"<@{user_id}>" for user_id in joining_user_ids])
+        # Update the view to reflect changes
+        await itr.response.edit_message(view=self)
 
-    @discord.ui.button(label="❌辞退",
-                       style=discord.ButtonStyle.red,
-                       custom_id="decline_event_btn")
-    async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if self.event is None:
-            await interaction.response.send_message("イベントの取得に失敗しました。", ephemeral=True, delete_after=10)
-            return
+    async def _on_decline_button_pressed(self, itr: discord.Interaction):
         try:
             joining_user_ids = await self.bot.db.get_joined_user_ids(self.event.id)
 
-            if interaction.user.id not in joining_user_ids:
-                await interaction.response.send_message("あなたはこのイベントに参加していません。", ephemeral=True, delete_after=10)
+            if itr.user.id not in joining_user_ids:
+                await itr.response.send_message("あなたはこのイベントに参加していません。", ephemeral=True, delete_after=10)
                 return
 
-            await self.bot.db.delete_joined_user(self.event.id, interaction.user.id)
-            joining_user_ids.remove(interaction.user.id)
+            await self.bot.db.delete_joined_user(self.event.id, itr.user.id)
+            joining_user_ids.remove(itr.user.id)
         except Exception as e:
-            await interaction.response.send_message("イベントの辞退処理に失敗しました。", ephemeral=True, delete_after=10)
+            await itr.response.send_message("イベントの辞退処理に失敗しました。", ephemeral=True, delete_after=10)
             return
 
-        # update embed
-        old_embed = interaction.message.embeds[0]  # get old embed
-        new_value = ""
-        for i, joining_user_id in enumerate(joining_user_ids):
-            user = self.bot.get_user(joining_user_id)
-            if user is not None:
-                new_value += f"`{i+1}.` {user.mention}\n"
-        old_embed.set_field_at(
-            2, name=old_embed.fields[2].name, value=new_value)
-        await interaction.response.edit_message(embeds=[old_embed, *interaction.message.embeds[1:]])
+        self.text_participants.content = "👥 " + \
+            ", ".join([f"<@{user_id}>" for user_id in joining_user_ids])
+        # Update the view to reflect changes
+        await itr.response.edit_message(view=self)
 
-    @discord.ui.button(label="💬コメントを送信",
-                       style=discord.ButtonStyle.blurple,
-                       custom_id="comment_event_btn")
-    async def comment(self, interaction: discord.Interaction, button: discord.ui.Button):
-        try:
-            await interaction.response.send_modal(EventCommentForm(timeout=600, origInteraction=interaction))
-        except Exception:
-            await interaction.response.send_message("コメントの送信に失敗しました。", ephemeral=True, delete_after=10)
-
-    @discord.ui.button(label="▶️イベントを開始",
-                       style=discord.ButtonStyle.gray,
-                       custom_id="start_event_btn")
-    async def start(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if self.event is None:
-            await interaction.response.send_message("イベントの取得に失敗しました。", ephemeral=True, delete_after=10)
-            return
-
-        if self.event.creator != interaction.user:
-            await interaction.response.send_message("あなたはこのイベントの作成者ではありません。", ephemeral=True, delete_after=10)
+    async def _on_start_button_pressed(self, itr: discord.Interaction):
+        if self.event.creator != itr.user:
+            await itr.response.send_message("あなたはこのイベントの作成者ではありません。", ephemeral=True, delete_after=10)
             return
 
         if self.event.status == discord.EventStatus.scheduled:
             await self.event.start()
-            await interaction.response.send_message("イベントが開始されました！", ephemeral=True, delete_after=10)
+            await itr.response.send_message("イベントが開始されました！", ephemeral=True, delete_after=10)
         elif self.event.status == discord.EventStatus.active or self.event.status == discord.EventStatus.ended:
-            await interaction.response.send_message("このイベントはすでにアクティブです。", ephemeral=True, delete_after=10)
+            await itr.response.send_message("このイベントはすでにアクティブです。", ephemeral=True, delete_after=10)
 
-    @discord.ui.button(label="❌イベントをキャンセル/終了",
-                       style=discord.ButtonStyle.gray,
-                       custom_id="cancel_event_btn")
-    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if self.event is None:
-            await interaction.response.send_message("イベントの取得に失敗しました。", ephemeral=True, delete_after=10)
-            return
-
-        if self.event.creator != interaction.user:
-            await interaction.response.send_message("あなたはこのイベントの作成者ではありません。", ephemeral=True, delete_after=10)
+    async def _on_cancel_button_pressed(self, itr: discord.Interaction):
+        if self.event.creator != itr.user:
+            await itr.response.send_message("あなたはこのイベントの作成者ではありません。", ephemeral=True, delete_after=10)
             return
 
         if self.event.status == discord.EventStatus.active:
             await self.event.end()
-            await interaction.response.send_message("イベントが正常に終了しました。", ephemeral=True, delete_after=10)
+            await itr.response.send_message("イベントが正常に終了しました。", ephemeral=True, delete_after=10)
         elif self.event.status == discord.EventStatus.scheduled:
             await self.event.cancel()
-            await interaction.response.send_message("イベントが正常にキャンセルされました。", ephemeral=True, delete_after=10)
+            await itr.response.send_message("イベントが正常にキャンセルされました。", ephemeral=True, delete_after=10)
         elif self.event.status == discord.EventStatus.ended or self.event.status == discord.EventStatus.cancelled:
-            await interaction.response.send_message("このイベントはすでに終了しています。", ephemeral=True, delete_after=10)
+            await itr.response.send_message("このイベントはすでに終了しています。", ephemeral=True, delete_after=10)
 
     @classmethod
     async def from_session_record(cls, bot, record: dict):
@@ -163,20 +157,21 @@ class EventView(discord.ui.View):
         try:
             guild = await bot.fetch_guild(guild_id)
         except discord.NotFound:
-            logger.warning(f"Guild with ID {guild_id} not found.")
+            logger.warning(f"Guild({guild_id}) not found.")
             return None
         try:
             event = await guild.fetch_scheduled_event(event_id)
         except discord.NotFound:
             logger.warning(
-                f"Event with ID {event_id} not found in guild {guild.name}.")
+                f"Event({event_id}) not found in guild({guild_id}).")
             return None
         return cls(bot, event)
 
 
-async def load_event_view_sessions(bot):
+async def reregister_event_views(bot):
     """
-    Load all event view sessions from the database.
+    アクティブなイベントセッションをデータベースから取得し、対応するビューを再登録します。
+    これにより、Botが再起動された場合でも、イベントの通知ビューが正しく表示され、機能するようになります。
     """
     sessions = await bot.db.get_active_event_sessions(
         current_time=datetime.datetime.now(tz))
@@ -185,11 +180,11 @@ async def load_event_view_sessions(bot):
         return
 
     for session in sessions:
-        view = await EventView.from_session_record(bot, session)
+        view = await EventNotificationLayoutView.from_session_record(bot, session)
         if view is not None:
+            logger.info(
+                f"Recreating event view: {session['event_id']} in guild {session['server_id']}")
             bot.add_view(view)  # Recreate the view with the bot and event
-    logger.info(
-        f"Loaded {len(sessions)} event view sessions from the database.")
 
 
 class EventNotify(commands.Cog):
@@ -198,28 +193,7 @@ class EventNotify(commands.Cog):
 
     @commands.Cog.listener()
     async def on_scheduled_event_create(self, e):
-        # create & send embed
-        notify_embed = discord.Embed(
-            title=e.name, description=e.description, color=discord.Colour.orange())
-        notify_embed.set_author(
-            name="🗓️ 開催予定のイベント", icon_url=e.guild.icon.url)
         fixed_start_time = e.start_time.astimezone(tz)
-        notify_embed.add_field(name="🕒 開催日時",
-                               value=f"**{fixed_start_time.strftime('%Y-%m-%d %H:%M')}~**")
-        if e.location is not None:
-            notify_embed.add_field(
-                name="📍 開催場所", value=f"**{e.location}**")
-        else:
-            notify_embed.add_field(
-                name="📡 開催チャンネル", value=e.channel.mention)
-        notify_embed.add_field(name="👥 参加者",
-                               value=f"`1.` {e.creator.mention}")
-        notify_embed.set_footer(
-            text=e.creator.display_name, icon_url=e.creator.avatar.url)
-        notify_embed.set_thumbnail(
-            url=e.cover_image.url if e.cover_image is not None else e.guild.icon.url)
-        notify_embed.timestamp = datetime.datetime.now()
-        notify_view = EventView(self.bot, e)
 
         try:
             channel = await self.bot.db.get_event_notify_channel(e.guild.id)
@@ -234,9 +208,9 @@ class EventNotify(commands.Cog):
             return
 
         notify_chan = self.bot.get_partial_messageable(channel["channel_id"])
-        embed = await notify_chan.send(embeds=[notify_embed], view=notify_view)
+        msg_id = await notify_chan.send(view=EventNotificationLayoutView(self.bot, e))
 
-        await self.bot.db.add_event(embed.id, e.id, e.guild.id, e.creator.id, e.name, e.description, fixed_start_time, notify_view.__class__.__name__, was_ended=False)
+        await self.bot.db.add_event(msg_id.id, e.id, e.guild.id, e.creator.id, e.name, e.description, fixed_start_time, EventNotificationLayoutView.__class__.__name__, was_ended=False)
         await self.bot.db.add_joined_user(e.id, e.creator.id)
         await self.bot.db.increment_point(e.guild.id, e.creator.id, 10)
 
@@ -260,65 +234,7 @@ class EventNotify(commands.Cog):
             return
 
         notify_msg = await notify_channel.fetch_message(notify_msg_data["msg_id"])
-        old_embed = notify_msg.embeds[0]
-
-        if after.status == discord.EventStatus.active:
-            new_embed = discord.Embed(
-                title=after.name, description=after.description, color=discord.Colour.brand_green())
-            new_embed.set_author(name="🎉 開催中のイベント",
-                                 icon_url=after.guild.icon.url)
-            logger.info(
-                f"Event was started: {after.guild.name=} - {after.name=} - {after.start_time=}")
-        elif after.status == discord.EventStatus.ended:
-            new_embed = discord.Embed(
-                title=after.name, description=after.description, color=discord.Colour.brand_red())
-            new_embed.set_author(name="🏁 終了したイベント",
-                                 icon_url=after.guild.icon.url)
-            await self.bot.db.update_event_status(
-                msg_id=notify_msg.id, was_ended=True)
-            logger.info(
-                f"Event was ended: {after.guild.name=} - {after.name=} - {after.start_time=}")
-        elif after.status == discord.EventStatus.cancelled:
-            await self.bot.db.delete_event(notify_msg.id)
-            await self.bot.db.delete_all_joined_users(after.id)
-            await self.bot.db.decrement_point(after.guild.id, after.creator.id, 10)
-            await notify_msg.delete()
-            logger.info(
-                f"Event was canceled: {after.guild.name=} - {after.name=} - {after.start_time=}")
-            return
-        else:
-            new_embed = discord.Embed(
-                title=after.name, description=after.description, color=discord.Colour.orange())
-            new_embed.set_author(name="🗓️ 開催予定のイベント",
-                                 icon_url=after.guild.icon.url)
-            logger.info(
-                f"Event was updated: {after.guild.name=} - {after.name=} - {after.start_time=}")
-
-        new_embed.set_thumbnail(
-            url=after.cover_image.url if after.cover_image is not None else after.guild.icon.url)
-        fixed_start_time = after.start_time.astimezone(tz)
-        for i, field in enumerate(old_embed.fields):
-            if i == 0:  # Schedule
-                new_embed.add_field(
-                    name=field.name, value=f"**{fixed_start_time.strftime('%Y-%m-%d %H:%M')}~**")
-            elif i == 1:  # Location or Channel
-                if after.location is not None:
-                    new_embed.add_field(
-                        name="📍 開催場所", value=f"**{after.location}**")
-                else:
-                    new_embed.add_field(
-                        name="📡 開催チャンネル", value=after.channel.mention)
-            else:
-                new_embed.add_field(name=field.name, value=field.value)
-        new_embed.set_footer(text=old_embed.footer.text,
-                             icon_url=old_embed.footer.icon_url)
-        new_embed.timestamp = old_embed.timestamp
-
-        if after.status == discord.EventStatus.ended:
-            await notify_msg.edit(embeds=[new_embed, *notify_msg.embeds[1:]], view=None)
-        else:
-            await notify_msg.edit(embeds=[new_embed, *notify_msg.embeds[1:]])
-            await self.bot.db.update_event(notify_msg.id, after.name, after.description, fixed_start_time)
+        await notify_msg.edit(view=EventNotificationLayoutView(self.bot, after))
 
 
 class EventNotifyChannelResistrationView(discord.ui.View):
